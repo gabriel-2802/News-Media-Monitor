@@ -1,11 +1,11 @@
 package app.demo.controllers;
 
 import app.demo.dto.NewsSourceDTO;
-import app.demo.dto.TopicDTO;
 import app.demo.dto.UserDTO;
 import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.TopicAlreadyExistsException;
 import app.demo.services.AdminService;
+import app.demo.services.monitoring.MonitorService;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +20,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminController {
     private final AdminService adminService;
+    private final MonitorService monitorService;
 
     @GetMapping("/users")
     @Transactional
@@ -113,6 +114,16 @@ public class AdminController {
             return ResponseEntity.ok(newsSources);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(null);
+        }
+    }
+
+    @PostMapping("/monitor/start")
+    public ResponseEntity<String> startMonitor() {
+        try {
+            monitorService.startMonitor();
+            return ResponseEntity.ok("Monitor started successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("An error occurred while starting the monitor: " + e.getMessage());
         }
     }
 }
