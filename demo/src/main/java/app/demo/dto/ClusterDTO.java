@@ -10,6 +10,5 @@ import java.util.Set;
 public class ClusterDTO {
     private Long id;
     private ArticleDTO originalSource;
-    private String topic;
     private Set<ArticleDTO> articles = new HashSet<>();
 }

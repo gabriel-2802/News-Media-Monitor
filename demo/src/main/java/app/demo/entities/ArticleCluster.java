@@ -15,9 +15,6 @@ public class ArticleCluster {
     @Column(name = "cluster_id")
     private Long id;
 
-    @ManyToOne
-    private Topic topic;
-
     @OneToOne
     private Article originalSource;
 
