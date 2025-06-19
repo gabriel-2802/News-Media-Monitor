@@ -13,6 +13,6 @@ public class NewsSource {
 
     private String name;
     private String baseUrl;
+    @Column(unique = true)
     private String rssUrl;
-
 }

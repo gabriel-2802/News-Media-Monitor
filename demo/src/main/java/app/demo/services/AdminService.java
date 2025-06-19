@@ -1,13 +1,18 @@
 package app.demo.services;
 
+import app.demo.dto.NewsSourceDTO;
 import app.demo.dto.TopicDTO;
 import app.demo.dto.UserDTO;
+import app.demo.entities.NewsSource;
 import app.demo.entities.Topic;
 import app.demo.entities.User;
+import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.TopicAlreadyExistsException;
 import app.demo.exceptions.TopicDoesNotExistException;
+import app.demo.mappers.NewsSourceMapper;
 import app.demo.mappers.TopicMapper;
 import app.demo.mappers.UserMapper;
+import app.demo.repositories.NewsSourceRepository;
 import app.demo.repositories.TopicRepository;
 import app.demo.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +30,9 @@ public class AdminService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final TopicRepository topicRepository;
-    private final TopicMapper topicMapper;
+    private final NewsSourceMapper newsSourceMapper;
+    private final NewsSourceRepository newsSourceRepository;
+
 
     public List<UserDTO> getAllUsers() {
         var users = userRepository.findAll();
@@ -36,6 +43,15 @@ public class AdminService {
         Optional<User> user = userRepository.findByUsername(username);
         if (user.isPresent()) {
             return userMapper.toDTO(user.get());
+        } else {
+            throw new UsernameNotFoundException("User not found");
+        }
+    }
+
+    public void deleteUser(String username) throws UsernameNotFoundException {
+        Optional<User> user = userRepository.findByUsername(username);
+        if (user.isPresent()) {
+            userRepository.delete(user.get());
         } else {
             throw new UsernameNotFoundException("User not found");
         }
@@ -70,4 +86,30 @@ public class AdminService {
                 .replaceAll("[^a-z\\s]", "")            // remove anything that's not a-z or whitespace
                 .replaceAll("\\s+", "_");               // convert spaces to underscores
     }
+
+    public NewsSourceDTO createNewsSource(NewsSourceDTO newsSourceDTO) throws ExistingRssSource {
+        if (newsSourceRepository.existsByRssUrl(newsSourceDTO.getRssUrl())) {
+            throw new ExistingRssSource();
+        }
+
+        NewsSource newsSource = newsSourceMapper.toEntity(newsSourceDTO);
+        newsSourceRepository.save(newsSource);
+        return newsSourceMapper.toDTO(newsSource);
+    }
+
+    public String deleteNewsSource(Long id) throws IllegalArgumentException {
+        NewsSource newsSource = newsSourceRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("News source not found with id: " + id));
+
+        newsSourceRepository.delete(newsSource);
+        return "News source deleted successfully";
+    }
+
+    public List<NewsSourceDTO> getAllNewsSources() {
+        List<NewsSource> newsSources = newsSourceRepository.findAll();
+        return newsSources.stream()
+                .map(newsSourceMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
 }

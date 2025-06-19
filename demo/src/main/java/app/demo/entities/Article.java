@@ -21,9 +21,11 @@ public class Article {
     private String url;
 
     private LocalDateTime published;
+    private String summary;
 
     private String sha256Hash;
     private long simHash;
+
 
     @ManyToOne
     private Topic topic;

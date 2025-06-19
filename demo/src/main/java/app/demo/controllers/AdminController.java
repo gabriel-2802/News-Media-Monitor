@@ -1,10 +1,13 @@
 package app.demo.controllers;
 
+import app.demo.dto.NewsSourceDTO;
 import app.demo.dto.TopicDTO;
 import app.demo.dto.UserDTO;
+import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.TopicAlreadyExistsException;
 import app.demo.services.AdminService;
 import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -42,6 +45,19 @@ public class AdminController {
         }
     }
 
+    @DeleteMapping("/users/{username}")
+    @Transactional
+    ResponseEntity<String> deleteUser(@PathVariable String username) {
+        try {
+            adminService.deleteUser(username);
+            return ResponseEntity.ok("User deleted successfully");
+        } catch (UsernameNotFoundException e) {
+            return ResponseEntity.status(404).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("An error occurred while deleting the user: " + e.getMessage());
+        }
+    }
+
     @PostMapping("topic/{topicName}")
     @Transactional
     ResponseEntity<String> createTopic(@PathVariable String topicName) {
@@ -63,6 +79,40 @@ public class AdminController {
             return ResponseEntity.ok("Topic deleted successfully");
         } catch (Exception e) {
             return ResponseEntity.status(500).body("An error occurred while deleting the topic: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/news_source")
+    ResponseEntity<NewsSourceDTO> createNewsSource(@Valid @RequestBody NewsSourceDTO newsSourceDTO) {
+        try {
+            NewsSourceDTO createdNewsSource = adminService.createNewsSource(newsSourceDTO);
+            return ResponseEntity.ok(createdNewsSource);
+        } catch (ExistingRssSource e) {
+            return ResponseEntity.status(409).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(null);
+        }
+    }
+
+    @DeleteMapping("/news_source/{id}")
+    ResponseEntity<String> deleteNewsSource(@PathVariable String id) {
+        try {
+            String response = adminService.deleteNewsSource(Long.parseLong(id));
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(404).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("An error occurred while deleting the news source: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/news_sources")
+    ResponseEntity<List<NewsSourceDTO>> getNewsSources() {
+        try {
+            List<NewsSourceDTO> newsSources = adminService.getAllNewsSources();
+            return ResponseEntity.ok(newsSources);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(null);
         }
     }
 }

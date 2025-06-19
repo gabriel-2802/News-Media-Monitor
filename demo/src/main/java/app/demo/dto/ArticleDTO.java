@@ -12,6 +12,7 @@ public class ArticleDTO {
     private String source;
     private String url;
     private LocalDateTime published;
+    private String summary;
 
     private String topic;
     private long clusterId;
