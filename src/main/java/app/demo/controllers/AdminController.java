@@ -120,7 +120,7 @@ public class AdminController {
     @PostMapping("/monitor/start")
     public ResponseEntity<String> startMonitor() {
         try {
-            monitorService.startMonitor();
+            monitorService.startMonitoring();
             return ResponseEntity.ok("Monitor started successfully");
         } catch (Exception e) {
             return ResponseEntity.status(500).body("An error occurred while starting the monitor: " + e.getMessage());

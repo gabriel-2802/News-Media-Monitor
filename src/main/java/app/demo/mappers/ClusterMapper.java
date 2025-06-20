@@ -6,5 +6,5 @@ import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring", uses = {ArticleMapper.class})
 public interface ClusterMapper {
-    ClusterDTO clusterToClusterDTO(ArticleCluster cluster);
+    ClusterDTO toDTO(ArticleCluster cluster);
 }
