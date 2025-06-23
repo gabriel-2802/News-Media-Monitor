@@ -5,8 +5,7 @@ import app.demo.dto.UserDTO;
 import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.TopicAlreadyExistsException;
 import app.demo.services.AdminService;
-import app.demo.services.monitoring.AbstractMonitorService;
-import app.demo.services.monitoring.AsyncMonitorService;
+import app.demo.services.monitoring.MonitorService;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +20,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminController {
     private final AdminService adminService;
-    private final AbstractMonitorService monitorService;
+    private final MonitorService monitorService;
 
     @GetMapping("/users")
     @Transactional

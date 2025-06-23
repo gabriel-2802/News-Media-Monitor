@@ -45,16 +45,12 @@ public class TopicAssigner {
 
     public void assignTopic(Article article) {
         String predictedTopic = classifierEngine.classify(article, topicMap.keySet());
+
         if (predictedTopic == null || predictedTopic.isEmpty()) {
             article.setTopic(topicRepository.getDefaultTopic());
         }
 
         article.setTopic(topicMap.get(predictedTopic));
-    }
-
-    public CompletableFuture<Void> assignTopicAsync(Article article) {
-        log.info("Assigning topic on {}", Thread.currentThread().getName());
-        return null;
     }
 
     private Map<String, Topic> getAvailableTopics() {

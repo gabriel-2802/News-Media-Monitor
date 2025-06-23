@@ -1,9 +1,20 @@
 # News Media Monitor
 
-admin user: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJnYWJyaWVsIiwicm9sZXMiOiJST0xFX0FETUlOIiwiaWF0IjoxNzUwMzIxNjM1LCJleHAiOjE3NTA5MjY0MzV9.3jQ5NvRvX4Rx0Pvx_9Pdo5VHWKW7IexhlJIZVhFe5BtuucFsm1Fp8ZDJOI5XTICZvJ8KWMBY4-oUG-CJ0-li1Q
+## Monitoring Speedup and Efficiency
 
-Understood. Here’s the cleaned-up `.md` documentation **without emojis**, with full request/response examples where applicable:
+The article gathering process was parallelized using a Custom ThreadPool Executor to improve the system's throughput when collecting news from multiple sources.
+Moreover, the classifying process was also parallelized using parallel streams to enhance the overall performance of the application.
 
+### Speedup Achieved
+$$
+\text{Speedup} = \frac{T_\text{serial}}{T_\text{parallel}}\approx 2.67
+$$
+
+### Efficiency (using 5 threads)
+
+$$
+\text{Efficiency} = \frac{\text{Speedup}}{\text{Number of threads}} = \frac{2.67}{5} \approx 0.534 = 53.4\%
+$$
 
 ### Base URL: `/api/auth`
 

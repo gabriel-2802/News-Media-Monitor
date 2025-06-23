@@ -14,10 +14,10 @@ import java.util.List;
  * It fetches articles synchronously, assigns topics to each article, and saves them to the repository.
  */
 @Service
-public class SingleThreadedMonitorService extends AbstractMonitorService {
+public class SyncMonitorService extends MonitorService {
 
-    public SingleThreadedMonitorService(RssFetcher rssFetcher, ArticleRepository articleRepository,
-                                        NewsSourceRepository newsSourceRepository, TopicAssigner topicAssigner) {
+    public SyncMonitorService(RssFetcher rssFetcher, ArticleRepository articleRepository,
+                              NewsSourceRepository newsSourceRepository, TopicAssigner topicAssigner) {
         super(rssFetcher, articleRepository, newsSourceRepository, topicAssigner);
     }
 

@@ -50,6 +50,7 @@ public class RssFetcher {
             for (SyndEntry entry : feed.getEntries()) {
                 articles.add(RssMapper.toEntity(entry, newsSource));
             }
+
         } catch (MalformedURLException e) {
             log.error(e.getMessage());
         } catch (Exception e) {
@@ -58,20 +59,11 @@ public class RssFetcher {
 
         return articles;
     }
+
     /*
-        * Asynchronously fetches articles from a given news source's RSS feed.
-        * This method allows for non-blocking fetching of articles, enabling better performance in applications that require concurrent operations.
-        * @param newsSource the NewsSource containing the RSS URL
-        * @return a CompletableFuture containing a list of Article entities fetched from the RSS feed
-     */
-    public CompletableFuture<List<Article> > fetchAsync(NewsSource newsSource) {
-        log.info("Fetching from {} on {}", newsSource.getName(), Thread.currentThread().getName());
-        return null;
-    }
-/*
-    Inner class to encapsulate the mapping logic.
-    This class is used to convert a SyndEntry object from the RSS feed into an Article entity.
- */
+     * Inner class to encapsulate the mapping logic.
+     * This class is used to convert a SyndEntry object from the RSS feed into an Article entity.
+    */
     private static class RssMapper {
         /**
          * Converts a SyndEntry to an Article entity.
