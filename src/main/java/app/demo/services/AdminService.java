@@ -1,21 +1,22 @@
 package app.demo.services;
 
 import app.demo.dto.NewsSourceDTO;
-import app.demo.dto.TopicDTO;
 import app.demo.dto.UserDTO;
 import app.demo.entities.NewsSource;
 import app.demo.entities.Topic;
 import app.demo.entities.User;
+import app.demo.events.TopicRepositoryChangeEvent;
 import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.TopicAlreadyExistsException;
 import app.demo.exceptions.TopicDoesNotExistException;
 import app.demo.mappers.NewsSourceMapper;
-import app.demo.mappers.TopicMapper;
 import app.demo.mappers.UserMapper;
+import app.demo.repositories.ArticleRepository;
 import app.demo.repositories.NewsSourceRepository;
 import app.demo.repositories.TopicRepository;
 import app.demo.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +33,8 @@ public class AdminService {
     private final TopicRepository topicRepository;
     private final NewsSourceMapper newsSourceMapper;
     private final NewsSourceRepository newsSourceRepository;
+    private final ArticleRepository articleRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
 
     public List<UserDTO> getAllUsers() {
@@ -67,6 +70,7 @@ public class AdminService {
             Topic topic = new Topic();
             topic.setName(normalizedTopicName);
             topicRepository.save(topic);
+            eventPublisher.publishEvent(new TopicRepositoryChangeEvent(topic, false));
         }
     }
 
@@ -75,6 +79,7 @@ public class AdminService {
         Optional<Topic> topic = topicRepository.findByName(normalizedTopicName);
         if (topic.isPresent()) {
             topicRepository.delete(topic.get());
+            eventPublisher.publishEvent(new TopicRepositoryChangeEvent(topic.get(), true));
         } else {
             throw new TopicDoesNotExistException(topicName);
         }
@@ -110,6 +115,15 @@ public class AdminService {
         return newsSources.stream()
                 .map(newsSourceMapper::toDTO)
                 .collect(Collectors.toList());
+    }
+
+    public String deleteAllArticles() {
+        try {
+            articleRepository.deleteAll();
+            return "All articles deleted successfully";
+        } catch (Exception e) {
+            return "Error deleting articles: " + e.getMessage();
+        }
     }
 
 }

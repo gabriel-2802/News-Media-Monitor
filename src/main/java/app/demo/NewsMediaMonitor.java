@@ -6,11 +6,17 @@ import app.demo.repositories.RoleRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
+
+import java.util.concurrent.CompletableFuture;
 
 @EnableScheduling
 @SpringBootApplication
+@EnableAsync
 public class NewsMediaMonitor {
 	public static void main(String[] args) {
 		SpringApplication.run(NewsMediaMonitor.class, args);
@@ -27,4 +33,5 @@ public class NewsMediaMonitor {
 			}
 		};
 	}
+
 }

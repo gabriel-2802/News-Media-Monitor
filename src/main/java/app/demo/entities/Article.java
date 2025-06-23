@@ -22,7 +22,7 @@ public class Article {
 
     @Column(length = 512)
     private String source;
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT", unique = true)
     private String url;
 
     private Date published;
@@ -32,16 +32,11 @@ public class Article {
     private String sha256Hash;
     private long simHash;
 
-
     @ManyToOne
     private Topic topic;
 
     @ManyToOne
     private ArticleCluster cluster;
-
-    public void generateRepresentation() {
-
-    }
 
     @Override
     public String toString() {

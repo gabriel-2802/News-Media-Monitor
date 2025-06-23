@@ -39,6 +39,7 @@ public class FeedController {
             List<ArticleDTO> articles = feedService.getAllArticles();
             return ResponseEntity.ok(articles);
         } catch (Exception e) {
+            log.error(e.getMessage());
             return ResponseEntity.status(500).body(null);
         }
     }

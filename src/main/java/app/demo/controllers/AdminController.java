@@ -5,7 +5,8 @@ import app.demo.dto.UserDTO;
 import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.TopicAlreadyExistsException;
 import app.demo.services.AdminService;
-import app.demo.services.monitoring.MonitorService;
+import app.demo.services.monitoring.AbstractMonitorService;
+import app.demo.services.monitoring.AsyncMonitorService;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminController {
     private final AdminService adminService;
-    private final MonitorService monitorService;
+    private final AbstractMonitorService monitorService;
 
     @GetMapping("/users")
     @Transactional
@@ -126,4 +127,16 @@ public class AdminController {
             return ResponseEntity.status(500).body("An error occurred while starting the monitor: " + e.getMessage());
         }
     }
+
+    @DeleteMapping("/delete_all_articles")
+    public ResponseEntity<String> deleteAllArticles() {
+        try {
+            String response = adminService.deleteAllArticles();
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("An error occurred while deleting all articles: " + e.getMessage());
+        }
+    }
+
+
 }
