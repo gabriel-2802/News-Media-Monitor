@@ -24,7 +24,6 @@ public class SyncMonitorService extends MonitorService {
     @Override
     public void startMonitoring() {
         List<Article> articles = new ArrayList<>();
-        List<NewsSource> newsSources = newsSourceRepository.findAll();
         for (NewsSource newsSource : newsSources) {
             List<Article> fetchedArticles = rssFetcher.fetchFrom(newsSource);
             fetchedArticles.forEach(topicAssigner::assignTopic);

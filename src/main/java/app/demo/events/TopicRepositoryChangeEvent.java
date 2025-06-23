@@ -2,11 +2,12 @@ package app.demo.events;
 
 import app.demo.entities.Topic;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 
-@Data
-@AllArgsConstructor
-public class TopicRepositoryChangeEvent {
-    private final Topic topic;
-    private final boolean isDeleted; // True if the topic was deleted, false if it was created or updated
+/**
+ * Event representing a change in the topic repository.
+ * @param topic The topic that was created, updated, or deleted
+ * @param isDeleted True if the topic was deleted, false if it was created or updated
+ */
+public record TopicRepositoryChangeEvent(Topic topic, boolean isDeleted) {
 }

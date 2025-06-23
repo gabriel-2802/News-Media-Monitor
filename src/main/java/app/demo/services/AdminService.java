@@ -5,6 +5,7 @@ import app.demo.dto.UserDTO;
 import app.demo.entities.NewsSource;
 import app.demo.entities.Topic;
 import app.demo.entities.User;
+import app.demo.events.NewsSourceRepoChangeEvent;
 import app.demo.events.TopicRepositoryChangeEvent;
 import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.TopicAlreadyExistsException;
@@ -99,6 +100,7 @@ public class AdminService {
 
         NewsSource newsSource = newsSourceMapper.toEntity(newsSourceDTO);
         newsSourceRepository.save(newsSource);
+        eventPublisher.publishEvent(new NewsSourceRepoChangeEvent());
         return newsSourceMapper.toDTO(newsSource);
     }
 
@@ -107,6 +109,7 @@ public class AdminService {
                 .orElseThrow(() -> new IllegalArgumentException("News source not found with id: " + id));
 
         newsSourceRepository.delete(newsSource);
+        eventPublisher.publishEvent(new NewsSourceRepoChangeEvent());
         return "News source deleted successfully";
     }
 

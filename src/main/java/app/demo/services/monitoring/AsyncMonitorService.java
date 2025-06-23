@@ -30,7 +30,6 @@ public class AsyncMonitorService extends MonitorService {
      */
     @Override
     public void startMonitoring() {
-        var newsSources = newsSourceRepository.findAll();
         List<CompletableFuture<List<Article>>> futures = new ArrayList<>();
 
         for (var source : newsSources) {

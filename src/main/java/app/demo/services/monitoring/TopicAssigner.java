@@ -5,19 +5,11 @@ import app.demo.entities.Topic;
 import app.demo.events.TopicRepositoryChangeEvent;
 import app.demo.repositories.TopicRepository;
 import app.demo.services.monitoring.engines.ClassifierEngine;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
 @Component
@@ -37,9 +29,9 @@ public class TopicAssigner {
     public void handleTopicRepositoryChangeEvent(TopicRepositoryChangeEvent event) {
         log.info("Received TopicRepositoryChangeEvent, updating topic map.");
         if (event.isDeleted()) {
-            topicMap.remove(event.getTopic().getName());
+            topicMap.remove(event.topic().getName());
         } else {
-            topicMap.put(event.getTopic().getName(), event.getTopic());
+            topicMap.put(event.topic().getName(), event.topic());
         }
     }
 
