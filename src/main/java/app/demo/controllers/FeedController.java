@@ -22,18 +22,17 @@ public class FeedController {
     private final FeedService feedService;
 
     @GetMapping("/topics")
-    @Transactional
     ResponseEntity<List<TopicDTO>> getAllTopics() {
         try {
             List<TopicDTO> topics = feedService.getAllTopics();
             return ResponseEntity.ok(topics);
         } catch (Exception e) {
+            log.error("Error retrieving topics: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(null);
         }
     }
 
     @GetMapping("/articles")
-    @Transactional
     ResponseEntity<List<ArticleDTO>> getAllArticles() {
         try {
             List<ArticleDTO> articles = feedService.getAllArticles();
@@ -45,7 +44,6 @@ public class FeedController {
     }
 
     @GetMapping("/articles/{topicName}")
-    @Transactional
     ResponseEntity<List<ArticleDTO>> getArticlesByTopic( @PathVariable String topicName) {
         try {
             List<ArticleDTO> articles = feedService.getArticlesByTopic(topicName);

@@ -14,6 +14,7 @@ import app.demo.repositories.RoleRepository;
 import app.demo.repositories.UserRepository;
 import app.demo.security.Constants;
 import app.demo.security.JWTGenerator;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -30,13 +31,12 @@ import java.util.Set;
 public class AuthService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-
     private final UserMapper userMapper;
-
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JWTGenerator jwtGenerator;
 
+    @Transactional
     public void register(RegisterDTO registerDTO) throws ExistingUsernameException, ExistingEmailException, ResourceNotFoundException {
 
         if (userRepository.findByUsername(registerDTO.getUsername()).isPresent()) {
@@ -55,17 +55,15 @@ public class AuthService {
                 ? RoleName.ROLE_ADMIN
                 : RoleName.ROLE_USER;
 
-        // Load role from database
+        // load role from database
         Role role = roleRepository.findByAuthority(roleName)
                 .orElseThrow(() -> new ResourceNotFoundException("Role " + roleName + " not found"));
 
-        // Set role directly
         user.setRoles(Set.of(role));
-
         userRepository.save(user);
     }
 
-
+    @Transactional
     public AuthDTO login(LoginDTO loginDTO) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(

@@ -4,7 +4,6 @@ import app.demo.entities.NewsSource;
 import app.demo.events.NewsSourceRepoChangeEvent;
 import app.demo.repositories.ArticleRepository;
 import app.demo.repositories.NewsSourceRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -26,7 +25,7 @@ public class MonitorService {
     }
 
     public void startMonitoring() {
-        var articles = monitorStrategy.getArticles(newsSources);
+        var articles = monitorStrategy.monitor(newsSources);
         try {
             articleRepository.saveAll(articles);
         } catch (DataIntegrityViolationException ignored) {}

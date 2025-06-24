@@ -1,6 +1,8 @@
-package app.demo.security;
+package app.demo.config;
 
-import app.demo.entities.User;
+import app.demo.security.CustomUserDetailService;
+import app.demo.security.JWTAuthEntryPoint;
+import app.demo.security.JWTAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,8 +34,8 @@ public class SecurityConfig {
                 .sessionManagement(sessionManagement ->
                         sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/user/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().permitAll())
                 .httpBasic(withDefaults())
                 .exceptionHandling(exceptionHandling ->

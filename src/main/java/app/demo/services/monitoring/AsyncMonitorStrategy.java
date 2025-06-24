@@ -23,7 +23,7 @@ public class AsyncMonitorStrategy extends MonitorStrategy {
     }
 
     @Override
-    public List<Article> getArticles(List<NewsSource> newsSources) {
+    public List<Article> monitor(List<NewsSource> newsSources) {
         List<CompletableFuture<List<Article>>> futures = new ArrayList<>();
 
         for (var source : newsSources) {

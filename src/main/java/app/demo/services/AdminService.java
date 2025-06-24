@@ -2,20 +2,23 @@ package app.demo.services;
 
 import app.demo.dto.NewsSourceDTO;
 import app.demo.dto.UserDTO;
+import app.demo.entities.Article;
 import app.demo.entities.NewsSource;
 import app.demo.entities.Topic;
 import app.demo.entities.User;
 import app.demo.events.NewsSourceRepoChangeEvent;
 import app.demo.events.TopicRepositoryChangeEvent;
 import app.demo.exceptions.ExistingRssSource;
+import app.demo.exceptions.SourceNotExisting;
 import app.demo.exceptions.TopicAlreadyExistsException;
-import app.demo.exceptions.TopicDoesNotExistException;
+import app.demo.exceptions.TopicNotFoundException;
 import app.demo.mappers.NewsSourceMapper;
 import app.demo.mappers.UserMapper;
 import app.demo.repositories.ArticleRepository;
 import app.demo.repositories.NewsSourceRepository;
 import app.demo.repositories.TopicRepository;
 import app.demo.repositories.UserRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -39,7 +42,7 @@ public class AdminService {
 
 
     public List<UserDTO> getAllUsers() {
-        var users = userRepository.findAll();
+        var users = userRepository.findAllWithTopics();
         return userMapper.toDTO(users);
     }
 
@@ -52,6 +55,7 @@ public class AdminService {
         }
     }
 
+    @Transactional
     public void deleteUser(String username) throws UsernameNotFoundException {
         Optional<User> user = userRepository.findByUsername(username);
         if (user.isPresent()) {
@@ -61,12 +65,13 @@ public class AdminService {
         }
     }
 
+    @Transactional
     public void createTopic(String topicName) throws TopicAlreadyExistsException {
         // normalize topic name and remove special characters
         String normalizedTopicName = normalizeTopicName(topicName);
 
         if (topicRepository.existsByName(normalizedTopicName)) {
-            throw new IllegalArgumentException("Topic with this name already exists");
+            throw new TopicAlreadyExistsException(normalizedTopicName);
         } else {
             Topic topic = new Topic();
             topic.setName(normalizedTopicName);
@@ -75,24 +80,44 @@ public class AdminService {
         }
     }
 
-    public void deleteTopic(String topicName) throws TopicDoesNotExistException {
+    @Transactional
+    public void deleteTopic(String topicName) throws TopicNotFoundException {
         String normalizedTopicName = normalizeTopicName(topicName);
         Optional<Topic> topic = topicRepository.findByName(normalizedTopicName);
-        if (topic.isPresent()) {
-            topicRepository.delete(topic.get());
-            eventPublisher.publishEvent(new TopicRepositoryChangeEvent(topic.get(), true));
-        } else {
-            throw new TopicDoesNotExistException(topicName);
+
+        if (topic.isEmpty()) {
+            throw new TopicNotFoundException(normalizedTopicName);
         }
+
+        Topic topicToDelete = topic.get();
+        Topic defaultTopic = topicRepository.getDefaultTopic();
+
+        // reassign articles
+        List<Article> articles = articleRepository.findByTopic(topicToDelete).stream()
+                .peek(article -> article.setTopic(defaultTopic))
+                .toList();
+        articleRepository.saveAll(articles);
+
+        // unlink users
+        List<User> users = userRepository.findAllSubcribedToTopic(topicToDelete);
+        users.forEach(user -> {
+            user.getSubscribedTopics().remove(topicToDelete);
+            userRepository.save(user);
+        });
+
+        topicRepository.delete(topicToDelete);
+        eventPublisher.publishEvent(new TopicRepositoryChangeEvent(topicToDelete, true));
     }
+
 
     private String normalizeTopicName(String topicName) {
         return topicName.trim().toLowerCase()
-                .replaceAll("\\d", "")                  // remove all digits
-                .replaceAll("[^a-z\\s]", "")            // remove anything that's not a-z or whitespace
-                .replaceAll("\\s+", "_");               // convert spaces to underscores
+                .replaceAll("\\d", "")
+                .replaceAll("[^a-z\\s]", " ")
+                .replaceAll("\\s+", "_");
     }
 
+    @Transactional
     public NewsSourceDTO createNewsSource(NewsSourceDTO newsSourceDTO) throws ExistingRssSource {
         if (newsSourceRepository.existsByRssUrl(newsSourceDTO.getRssUrl())) {
             throw new ExistingRssSource();
@@ -104,13 +129,14 @@ public class AdminService {
         return newsSourceMapper.toDTO(newsSource);
     }
 
-    public String deleteNewsSource(Long id) throws IllegalArgumentException {
+    @Transactional
+    public NewsSourceDTO deleteNewsSource(Long id) throws IllegalArgumentException, SourceNotExisting {
         NewsSource newsSource = newsSourceRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("News source not found with id: " + id));
+                .orElseThrow(() -> new SourceNotExisting("News source with id " + id + " does not exist"));
 
         newsSourceRepository.delete(newsSource);
         eventPublisher.publishEvent(new NewsSourceRepoChangeEvent());
-        return "News source deleted successfully";
+        return newsSourceMapper.toDTO(newsSource);
     }
 
     public List<NewsSourceDTO> getAllNewsSources() {
@@ -120,13 +146,9 @@ public class AdminService {
                 .collect(Collectors.toList());
     }
 
-    public String deleteAllArticles() {
-        try {
-            articleRepository.deleteAll();
-            return "All articles deleted successfully";
-        } catch (Exception e) {
-            return "Error deleting articles: " + e.getMessage();
-        }
+    @Transactional
+    public void deleteAllArticles() {
+        articleRepository.deleteAll();
     }
 
 }

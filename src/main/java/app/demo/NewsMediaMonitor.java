@@ -19,10 +19,10 @@ public class NewsMediaMonitor {
 	@Bean
 	CommandLineRunner run(RoleRepository roleRepository) {
 		return args -> {
-			if (roleRepository.existsByAuthority(RoleName.ROLE_USER)) {
+			if (!roleRepository.existsByAuthority(RoleName.ROLE_USER)) {
 				roleRepository.save(new Role(RoleName.ROLE_USER));
 			}
-			if (roleRepository.existsByAuthority(RoleName.ROLE_ADMIN)) {
+			if (!roleRepository.existsByAuthority(RoleName.ROLE_ADMIN)) {
 				roleRepository.save(new Role(RoleName.ROLE_ADMIN));
 			}
 		};

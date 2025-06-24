@@ -16,7 +16,4 @@ public class Topic {
     private Long id;
     @Column(unique = true, nullable = false)
     private String name;
-
-    @ManyToMany(mappedBy = "subscribedTopics")
-    private Set<User> subscribers = new HashSet<>();
 }

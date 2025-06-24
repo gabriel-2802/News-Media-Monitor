@@ -19,7 +19,7 @@ public class SyncMonitorStrategy extends MonitorStrategy {
     }
 
     @Override
-    public List<Article> getArticles(List<NewsSource> newsSources) {
+    public List<Article> monitor(List<NewsSource> newsSources) {
         List<Article> articles = new ArrayList<>();
         for (NewsSource newsSource : newsSources) {
             List<Article> fetchedArticles = rssFetcher.fetchFrom(newsSource);
