@@ -1,5 +1,7 @@
 package app.demo.config;
 
+import lombok.AllArgsConstructor;
+import lombok.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,14 +14,16 @@ import java.util.concurrent.Executor;
 
 @Configuration
 @EnableAsync
+@AllArgsConstructor
 public class AsyncConfig {
+    private final AsyncProperties asyncProperties;
 
     @Bean
     public Executor myTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(5);
-        executor.setMaxPoolSize(10);
-        executor.setQueueCapacity(100);
+        executor.setCorePoolSize(asyncProperties.getCorePoolSize());
+        executor.setMaxPoolSize(asyncProperties.getMaxPoolSize());
+        executor.setQueueCapacity(asyncProperties.getQueueCapacity());
         executor.setThreadNamePrefix("MyAsync-");
         executor.initialize();
         return executor;
