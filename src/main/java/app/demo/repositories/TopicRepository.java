@@ -7,7 +7,9 @@ import java.util.Optional;
 
 public interface TopicRepository extends JpaRepository<Topic, Long> {
     boolean existsByName(String name);
+
     Optional<Topic> findByName(String topicName);
+
     default Topic getDefaultTopic() {
         return findByName("general")
                 .orElseThrow(() -> new IllegalStateException("Default topic not found"));

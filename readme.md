@@ -20,6 +20,7 @@ $$
 
 ## Search Functionality
 
+
 The application includes a full-text search system that allows users to search for articles using free-form keywords. It leverages PostgreSQL's native full-text search features, optimized with GIN indexing for performance and scalability.
 
 ### Features
@@ -75,11 +76,12 @@ USING gin(to_tsvector('english', title || ' ' || content));
 
 This index maps each word in the dataset to the rows where it appears, enabling fast search even over large text fields.
 
-### Base URL: `/api/auth`
 
 ---
 
-### POST `/register`
+### API Documentation
+
+### POST `/api/auth/register`
 
 Registers a new user.
 
@@ -121,7 +123,7 @@ Registers a new user.
 
 ---
 
-### POST `/login`
+### POST `/api/auth/login`
 
 Authenticates a user and returns an authentication token.
 
@@ -163,15 +165,11 @@ Authenticates a user and returns an authentication token.
 
 ---
 
-### Base URL: `/api/feed`
-
----
-
-### GET `/topics`
+### GET `/api/feed/topics`
 
 Returns all available topics.
 
-**Response:**
+**Responses:**
 
 * **200 OK**
 
@@ -196,17 +194,11 @@ Returns all available topics.
 
 ---
 
-### Base URL: `/api/admin`
-
-Requires admin authentication.
-
----
-
-### GET `/users`
+### GET `/api/admin/users`
 
 Returns all users.
 
-**Response:**
+**Responses:**
 
 * **200 OK**
 
@@ -227,7 +219,7 @@ Returns all users.
 
 ---
 
-### GET `/users/{username}`
+### GET `/api/admin/users/{username}`
 
 Returns user details by username.
 
@@ -235,7 +227,7 @@ Returns user details by username.
 
 * `username` (String)
 
-**Response:**
+**Responses:**
 
 * **200 OK**
 
@@ -255,7 +247,7 @@ Returns user details by username.
 
 ---
 
-### DELETE `/users/{username}`
+### DELETE `/api/admin/users/{username}`
 
 Deletes a user by username.
 
@@ -263,7 +255,7 @@ Deletes a user by username.
 
 * `username` (String)
 
-**Response:**
+**Responses:**
 
 * **200 OK**
 
@@ -285,7 +277,7 @@ Deletes a user by username.
 
 ---
 
-### POST `/topic/{topicName}`
+### POST `/api/admin/topic/{topicName}`
 
 Creates a new topic.
 
@@ -293,7 +285,7 @@ Creates a new topic.
 
 * `topicName` (String)
 
-**Response:**
+**Responses:**
 
 * **200 OK**
 
@@ -309,7 +301,7 @@ Creates a new topic.
 
 ---
 
-### DELETE `/topic/{topicName}`
+### DELETE `/api/admin/topic/{topicName}`
 
 Deletes a topic.
 
@@ -317,7 +309,7 @@ Deletes a topic.
 
 * `topicName` (String)
 
-**Response:**
+**Responses:**
 
 * **200 OK**
 
@@ -333,7 +325,7 @@ Deletes a topic.
 
 ---
 
-### POST `/news_source`
+### POST `/api/admin/news_source`
 
 Creates a new news source.
 
@@ -347,7 +339,7 @@ Creates a new news source.
 }
 ```
 
-**Response:**
+**Responses:**
 
 * **200 OK**
 
@@ -368,7 +360,7 @@ Creates a new news source.
 
 ---
 
-### DELETE `/news_source/{id}`
+### DELETE `/api/admin/news_source/{id}`
 
 Deletes a news source.
 
@@ -376,7 +368,7 @@ Deletes a news source.
 
 * `id` (Long)
 
-**Response:**
+**Responses:**
 
 * **200 OK**
 
@@ -398,11 +390,11 @@ Deletes a news source.
 
 ---
 
-### GET `/news_sources`
+### GET `/api/admin/news_sources`
 
 Returns all registered news sources.
 
-**Response:**
+**Responses:**
 
 * **200 OK**
 
@@ -425,11 +417,11 @@ Returns all registered news sources.
 
 ---
 
-### POST `/monitor/start`
+### POST `/api/admin/monitor/start`
 
 Manually starts the monitoring process.
 
-**Response:**
+**Responses:**
 
 * **200 OK**
 
@@ -443,4 +435,3 @@ Manually starts the monitoring process.
   An error occurred while starting the monitor: {error message}
   ```
 
----
