@@ -114,17 +114,6 @@ public class AdminController {
         }
     }
 
-    @GetMapping("/news_sources")
-    ResponseEntity<List<NewsSourceDTO>> getNewsSources() {
-        try {
-            List<NewsSourceDTO> newsSources = adminService.getAllNewsSources();
-            return ResponseEntity.ok(newsSources);
-        } catch (Exception e) {
-            log.error("Error retrieving news sources: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body(null);
-        }
-    }
-
     @PostMapping("/monitor/start")
     public ResponseEntity<String> startMonitor() {
         try {

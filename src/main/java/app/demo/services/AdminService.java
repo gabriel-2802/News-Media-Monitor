@@ -139,13 +139,6 @@ public class AdminService {
         return newsSourceMapper.toDTO(newsSource);
     }
 
-    public List<NewsSourceDTO> getAllNewsSources() {
-        List<NewsSource> newsSources = newsSourceRepository.findAll();
-        return newsSources.stream()
-                .map(newsSourceMapper::toDTO)
-                .collect(Collectors.toList());
-    }
-
     @Transactional
     public void deleteAllArticles() {
         articleRepository.deleteAll();

@@ -16,6 +16,65 @@ $$
 \text{Efficiency} = \frac{\text{Speedup}}{\text{Number of threads}} = \frac{2.67}{5} \approx 0.534 = 53.4\%
 $$
 
+---
+
+## Search Functionality
+
+The application includes a full-text search system that allows users to search for articles using free-form keywords. It leverages PostgreSQL's native full-text search features, optimized with GIN indexing for performance and scalability.
+
+### Features
+
+* Search across both article titles and content
+* Handles case differences and common word forms (e.g., "run", "running")
+* Language-aware tokenization and stemming (English)
+* High performance, even with large volumes of data
+
+### Technical Overview
+
+PostgreSQL provides full-text search support through `tsvector` (searchable document format) and `tsquery` (user query format). These are used together to match articles efficiently.
+
+#### `to_tsvector(language, text)`
+
+Transforms a block of text into a normalized form by:
+
+* Removing stopwords (e.g., "the", "and", "în", "la")
+* Tokenizing words
+* Applying stemming (e.g., "economia" becomes "econom")
+
+#### `plainto_tsquery(language, search)`
+
+Processes user input into a `tsquery`, applying the same language rules as `to_tsvector`.
+
+#### `@@` Operator
+
+Evaluates whether the text vector matches the search query:
+
+```sql
+to_tsvector(...) @@ plainto_tsquery(...)
+```
+
+### Example SQL Query
+
+```sql
+SELECT * FROM articles
+WHERE to_tsvector('english', title || ' ' || content)
+      @@ plainto_tsquery('english', 'energy crisis');
+```
+
+This query returns all articles whose title or content includes both "energy" and "crisis" in any form or order.
+
+### Indexing for Performance
+
+To avoid full table scans during searches, a GIN (Generalized Inverted Index) is used:
+
+```sql
+CREATE INDEX idx_articles_fts
+ON articles
+USING gin(to_tsvector('english', title || ' ' || content));
+```
+
+This index maps each word in the dataset to the rows where it appears, enabling fast search even over large text fields.
+
 ### Base URL: `/api/auth`
 
 ---
