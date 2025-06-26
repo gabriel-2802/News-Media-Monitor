@@ -1,5 +1,71 @@
 # News Media Monitor
 
+## News Processing Pipeline Overview
+
+### RSS Fetching
+
+The application collects news articles by fetching and parsing RSS feeds from registered news sources. This functionality is encapsulated in the `RssFetcher` component.
+
+* **Input:** A list of RSS feed URLs stored in the database.
+* **Process:**
+
+  * Performs HTTP GET requests to retrieve RSS XML content.
+  * Parses the XML using the Rome library.
+  * Extracts key fields including:
+    * `title`
+    * `link`
+    * `description`
+    * `pubDate`
+    * `content`
+* **Output:** A list of raw articles prepared for further classification and storage.
+
+**Example RSS item:**
+
+```xml
+<item>
+  <title>Breaking News</title>
+  <link>https://example.com/news/123</link>
+  <description>Something happened...</description>
+  <pubDate>Tue, 25 Jun 2025 14:00:00 GMT</pubDate>
+</item>
+```
+
+### Hugging Face Classifier Integration
+
+News articles are semantically classified using a transformer-based zero-shot text classifier.
+
+* **Model:** `valhalla/distilbart-mnli-12-1`
+* **Service:** Hugging Face Inference API
+* **Component:** `HuggingFaceClassifierEngine`
+* **Classification Approach:**
+
+  * The article's `title` and `content` are concatenated into one input string.
+  * A candidate label list (topics) is passed to the API.
+  * The API returns a ranked list of labels based on textual entailment probabilities.
+
+**Sample API Request:**
+
+```json
+{
+  "inputs": "Article title and body text",
+  "parameters": {
+    "candidate_labels": ["Politics", "Technology", "Health"]
+  }
+}
+```
+
+**Sample API Response:**
+
+```json
+{
+  "labels": ["Politics", "Technology", "Health"],
+  "scores": [0.94, 0.03, 0.02]
+}
+```
+
+The system assigns the label with the highest score to the article.
+
+
 ## Monitoring Speedup and Efficiency
 
 The article gathering process was parallelized using a Custom ThreadPool Executor to improve the system's throughput when collecting news from multiple sources.
