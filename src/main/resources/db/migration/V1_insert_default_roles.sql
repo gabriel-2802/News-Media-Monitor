@@ -1,0 +1,7 @@
+INSERT INTO roles (authority)
+SELECT 'ROLE_USER'
+WHERE NOT EXISTS (SELECT 1 FROM roles WHERE authority = 'ROLE_USER');
+
+INSERT INTO roles (authority)
+SELECT 'ROLE_ADMIN'
+WHERE NOT EXISTS (SELECT 1 FROM roles WHERE authority = 'ROLE_ADMIN');

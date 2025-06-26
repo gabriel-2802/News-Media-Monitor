@@ -2,6 +2,7 @@ package app.demo.mappers;
 
 import app.demo.dto.RegisterDTO;
 import app.demo.dto.UserDTO;
+import app.demo.entities.Role;
 import app.demo.entities.User;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
@@ -27,7 +28,7 @@ public interface UserMapper {
     }
 
     default Set<String> mapRoles(User user) {
-        return user.getRoles().stream().map(role -> role.getAuthority().toString()).collect(java.util.stream.Collectors.toSet());
+        return user.getRoles().stream().map(Role::getAuthority).collect(java.util.stream.Collectors.toSet());
     }
 
 }
