@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16
+    container_name: news_monitor_db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: news_monitor_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  ai_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai_service
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: admin
+      DB_PASSWORD: admin
+      DB_NAME: news_monitor_db
+    volumes:
+      - ./ai_models:/app
+
+volumes:
+  postgres-data:
