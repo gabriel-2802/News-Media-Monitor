@@ -4,11 +4,8 @@ import app.demo.dto.NewsSourceDTO;
 import app.demo.dto.UserDTO;
 import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.SourceNotExisting;
-import app.demo.exceptions.TopicAlreadyExistsException;
-import app.demo.exceptions.TopicNotFoundException;
 import app.demo.services.AdminService;
 import app.demo.services.monitoring.MonitorService;
-import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +15,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * rest controller for administrative operations.
+ *
+ * <p>
+ * provides endpoints for managing users, news sources, and monitoring processes.
+ * accessible only to users with admin privileges.
+ * </p>
+ */
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor

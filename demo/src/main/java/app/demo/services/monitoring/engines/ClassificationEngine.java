@@ -5,11 +5,11 @@ import app.demo.entities.Article;
 import java.util.List;
 
 /**
- * Interface for engines that classify articles into topics.
+ * interface for engines that classify articles into topics.
  */
 public interface ClassificationEngine {
     /**
-     * Classifies the given article into one of the provided topics.
+     * classifies the given article into one of the provided topics.
      *
      * @param article the article to classify
      * @param topics the set of possible topic names

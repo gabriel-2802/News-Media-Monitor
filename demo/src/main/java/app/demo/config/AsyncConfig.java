@@ -1,17 +1,20 @@
 package app.demo.config;
 
 import lombok.AllArgsConstructor;
-import lombok.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
+/**
+ * configuration class that sets up asynchronous execution support in the application.
+ * <p>
+ * it enables Spring's asynchronous method execution and defines a custom thread pool
+ * executor using properties loaded from {@link AsyncProperties}.
+ * </p>
+ */
 @Configuration
 @EnableAsync
 @AllArgsConstructor

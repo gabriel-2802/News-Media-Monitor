@@ -30,5 +30,4 @@ public interface UserMapper {
     default Set<String> mapRoles(User user) {
         return user.getRoles().stream().map(Role::getAuthority).collect(java.util.stream.Collectors.toSet());
     }
-
 }

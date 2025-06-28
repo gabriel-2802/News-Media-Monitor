@@ -6,6 +6,7 @@ import app.demo.dto.RegisterDTO;
 import app.demo.exceptions.ExistingEmailException;
 import app.demo.exceptions.ExistingUsernameException;
 import app.demo.services.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +15,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.core.AuthenticationException;
 
+/**
+ * rest controller that handles user authentication endpoints.
+ *
+ * <p>
+ * provides endpoints for user registration and login, interacting with {@link AuthService}.
+ * </p>
+ */
 @RestController
 @RequestMapping("api/auth")
 @RequiredArgsConstructor
@@ -21,7 +29,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody RegisterDTO registerDTO) {
+    public ResponseEntity<String> register(@Valid @RequestBody RegisterDTO registerDTO) {
         try {
             authService.register(registerDTO);
             return ResponseEntity.ok("User registered successfully");
@@ -36,7 +44,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthDTO> login(@RequestBody LoginDTO loginDTO) {
+    public ResponseEntity<AuthDTO> login(@Valid @RequestBody LoginDTO loginDTO) {
         try {
             AuthDTO response = authService.login(loginDTO);
             return ResponseEntity.ok(response);

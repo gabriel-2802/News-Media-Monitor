@@ -4,10 +4,7 @@ import app.demo.dto.TopicDTO;
 import app.demo.dto.UserDTO;
 import app.demo.exceptions.AlreadySubscribed;
 import app.demo.exceptions.TopicNotFoundException;
-import app.demo.security.JWTGenerator;
 import app.demo.services.UserAccountService;
-import jakarta.transaction.Transactional;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +15,13 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Objects;
 
+/**
+ * rest controller that handles user account operations such as viewing profiles and managing topic subscriptions.
+ *
+ * <p>
+ * provides authenticated users with endpoints to access their profile and subscribe or unsubscribe from topics.
+ * </p>
+ */
 @Controller
 @RequestMapping("/api/user")
 @RequiredArgsConstructor

@@ -9,7 +9,6 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface ArticleRepository extends JpaRepository<Article, Long> {
-
     List<Article> findByTopic(Topic topic);
 
     @Query(value = """

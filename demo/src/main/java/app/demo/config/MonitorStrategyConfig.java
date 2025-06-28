@@ -9,6 +9,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * configuration class that provides a {@link MonitorStrategy} bean
+ * based on the application property {@code monitoring.strategy}.
+ *
+ * <p>
+ * it dynamically selects between {@link AsyncMonitorStrategy} and {@link SequentialMonitorStrategy}
+ * depending on whether parallel or single-threaded execution is desired.
+ * </p>
+ */
 @Configuration
 public class MonitorStrategyConfig {
 

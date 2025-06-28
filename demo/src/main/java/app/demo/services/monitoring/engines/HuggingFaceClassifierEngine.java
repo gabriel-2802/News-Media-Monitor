@@ -13,10 +13,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.List;
 
-/*
- * HuggingFaceClassifierEngine.java
- * This class implements the ClassifierEngine interface using Hugging Face's DistilBART model for text classification.
- * It sends a request to the Hugging Face API with the article content and receives the predicted label.
+/**
+ * this class implements the ClassifierEngine interface using Hugging Face's DistilBART model for text classification.
+ * it sends a request to the Hugging Face API with the article content and receives the predicted label.
  */
 @Component
 @Slf4j
