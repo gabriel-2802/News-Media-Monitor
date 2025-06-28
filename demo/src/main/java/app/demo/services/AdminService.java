@@ -66,58 +66,6 @@ public class AdminService {
     }
 
     @Transactional
-    public void createTopic(String topicName) throws TopicAlreadyExistsException {
-        // normalize topic name and remove special characters
-        String normalizedTopicName = normalizeTopicName(topicName);
-
-        if (topicRepository.existsByName(normalizedTopicName)) {
-            throw new TopicAlreadyExistsException(normalizedTopicName);
-        } else {
-            Topic topic = new Topic();
-            topic.setName(normalizedTopicName);
-            topicRepository.save(topic);
-            eventPublisher.publishEvent(new TopicRepositoryChangeEvent(topic, false));
-        }
-    }
-
-    @Transactional
-    public void deleteTopic(String topicName) throws TopicNotFoundException {
-        String normalizedTopicName = normalizeTopicName(topicName);
-        Optional<Topic> topic = topicRepository.findByName(normalizedTopicName);
-
-        if (topic.isEmpty()) {
-            throw new TopicNotFoundException(normalizedTopicName);
-        }
-
-        Topic topicToDelete = topic.get();
-        Topic defaultTopic = topicRepository.getDefaultTopic();
-
-        // reassign articles
-        List<Article> articles = articleRepository.findByTopic(topicToDelete).stream()
-                .peek(article -> article.setTopic(defaultTopic))
-                .toList();
-        articleRepository.saveAll(articles);
-
-        // unlink users
-        List<User> users = userRepository.findAllSubcribedToTopic(topicToDelete);
-        users.forEach(user -> {
-            user.getSubscribedTopics().remove(topicToDelete);
-            userRepository.save(user);
-        });
-
-        topicRepository.delete(topicToDelete);
-        eventPublisher.publishEvent(new TopicRepositoryChangeEvent(topicToDelete, true));
-    }
-
-
-    private String normalizeTopicName(String topicName) {
-        return topicName.trim().toLowerCase()
-                .replaceAll("\\d", "")
-                .replaceAll("[^a-z\\s]", " ")
-                .replaceAll("\\s+", "_");
-    }
-
-    @Transactional
     public NewsSourceDTO createNewsSource(NewsSourceDTO newsSourceDTO) throws ExistingRssSource {
         if (newsSourceRepository.existsByRssUrl(newsSourceDTO.getRssUrl())) {
             throw new ExistingRssSource();
@@ -140,8 +88,8 @@ public class AdminService {
     }
 
     @Transactional
-    public void deleteAllArticles() {
-        articleRepository.deleteAll();
+    public void purgeAll() {
+
     }
 
 }

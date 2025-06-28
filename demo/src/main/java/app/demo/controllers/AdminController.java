@@ -63,32 +63,6 @@ public class AdminController {
         }
     }
 
-    @PostMapping("topic/{topicName}")
-    ResponseEntity<String> createTopic(@PathVariable String topicName) {
-        try {
-            adminService.createTopic(topicName);
-            return ResponseEntity.ok("Topic created successfully");
-        } catch (TopicAlreadyExistsException e) {
-            return ResponseEntity.status(409).body(e.getMessage());
-        } catch (Exception e) {
-            log.error("Error creating topic: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body("An error occurred while creating the topic");
-        }
-    }
-
-    @DeleteMapping("/topic/{topicName}")
-    ResponseEntity<String> deleteTopic(@PathVariable String topicName) {
-        try {
-            adminService.deleteTopic(topicName);
-            return ResponseEntity.ok("Topic deleted successfully");
-        } catch (TopicNotFoundException e) {
-            return ResponseEntity.status(404).body(e.getMessage());
-        } catch (Exception e) {
-            log.error("Error deleting topic: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body("An error occurred while deleting the topic " + topicName);
-        }
-    }
-
     @PostMapping("/news_source")
     ResponseEntity<NewsSourceDTO> createNewsSource(@Valid @RequestBody NewsSourceDTO newsSourceDTO) {
         try {
@@ -125,12 +99,13 @@ public class AdminController {
         }
     }
 
-    @DeleteMapping("/delete_all_articles")
-    public ResponseEntity<String> deleteAllArticles() {
+    @DeleteMapping("/purge_all")
+    public ResponseEntity<String> purgeAllArticles() {
         try {
-            adminService.deleteAllArticles();
+            adminService.purgeAll();
             return ResponseEntity.ok("All articles deleted successfully");
         } catch (Exception e) {
+            log.error("Error deleting all articles: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body("An error occurred while deleting all articles: " + e.getMessage());
         }
     }

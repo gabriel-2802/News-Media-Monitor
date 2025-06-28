@@ -4,25 +4,34 @@ import app.demo.entities.Article;
 import app.demo.entities.Topic;
 import app.demo.events.TopicRepositoryChangeEvent;
 import app.demo.repositories.TopicRepository;
-import app.demo.services.monitoring.engines.ClassifierEngine;
+import app.demo.services.monitoring.engines.ClassificationEngine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * component responsible for assigning topics to articles using a classification engine.
+ * <p>
+ * it listens for topic repository change events to keep its internal topic map in sync.
+ * topics are predicted using the {@link ClassificationEngine} and resolved via the {@link TopicRepository}.
+ */
 @Component
 @Slf4j
 public class TopicAssigner {
-    private final ClassifierEngine classifierEngine;
+    private final ClassificationEngine classifierEngine;
     private final TopicRepository topicRepository;
-    private Map<String, Topic> topicMap;
+    private final Map<String, Topic> topicMap;
+    List<String> topicNames;
 
-    public TopicAssigner(ClassifierEngine classifierEngine, TopicRepository topicRepository) {
+    public TopicAssigner(ClassificationEngine classifierEngine, TopicRepository topicRepository) {
         this.classifierEngine = classifierEngine;
         this.topicRepository = topicRepository;
         this.topicMap = getAvailableTopics();
+        this.topicNames = topicMap.keySet().stream().toList();
     }
 
     @EventListener
@@ -33,10 +42,12 @@ public class TopicAssigner {
         } else {
             topicMap.put(event.topic().getName(), event.topic());
         }
+        topicNames = topicMap.keySet().stream().toList();
     }
 
     public void assignTopic(Article article) {
-        String predictedTopic = classifierEngine.classify(article, topicMap.keySet());
+
+        String predictedTopic = classifierEngine.classify(article, topicNames);
 
         if (predictedTopic == null || predictedTopic.isEmpty()) {
             article.setTopic(topicRepository.getDefaultTopic());
@@ -46,7 +57,7 @@ public class TopicAssigner {
     }
 
     private Map<String, Topic> getAvailableTopics() {
-        return topicRepository.findAll().stream()
+        return topicRepository.findAllOrdered().stream()
                 .collect(Collectors.toMap(Topic::getName, topic -> topic));
     }
 

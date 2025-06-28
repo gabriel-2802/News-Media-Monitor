@@ -1,14 +1,13 @@
 package app.demo.services.monitoring.engines;
 
 import app.demo.entities.Article;
-import app.demo.entities.Topic;
 
-import java.util.Set;
+import java.util.List;
 
 /**
  * Interface for engines that classify articles into topics.
  */
-public interface ClassifierEngine {
+public interface ClassificationEngine {
     /**
      * Classifies the given article into one of the provided topics.
      *
@@ -16,5 +15,5 @@ public interface ClassifierEngine {
      * @param topics the set of possible topic names
      * @return the name of the topic assigned to the article
      */
-    String classify(Article article, Set<String> topics);
+    String classify(Article article, List<String> topics);
 }

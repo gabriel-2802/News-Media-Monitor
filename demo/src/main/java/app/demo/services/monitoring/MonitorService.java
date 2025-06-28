@@ -4,6 +4,7 @@ import app.demo.entities.NewsSource;
 import app.demo.events.NewsSourceRepoChangeEvent;
 import app.demo.repositories.ArticleRepository;
 import app.demo.repositories.NewsSourceRepository;
+import app.demo.services.monitoring.strategy.MonitorStrategy;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;

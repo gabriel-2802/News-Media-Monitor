@@ -1,20 +1,24 @@
-package app.demo.services.monitoring;
+package app.demo.services.monitoring.strategy;
 
 import app.demo.entities.Article;
 import app.demo.entities.NewsSource;
-import app.demo.repositories.ArticleRepository;
-import app.demo.repositories.NewsSourceRepository;
-import org.springframework.dao.DataIntegrityViolationException;
+import app.demo.services.monitoring.RssFetcher;
+import app.demo.services.monitoring.TopicAssigner;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * sequential implementation of {@link MonitorStrategy} that processes news sources one at a time.
+ * <p>
+ * this strategy fetches articles and assigns topics in a simple, non-parallel manner.
+ * it's useful for debugging, testing, or when simplicity is preferred over performance.
+ */
 @Component
-public class SyncMonitorStrategy extends MonitorStrategy {
+public class SequentialMonitorStrategy extends MonitorStrategy {
 
-    public SyncMonitorStrategy(RssFetcher rssFetcher, TopicAssigner topicAssigner) {
+    public SequentialMonitorStrategy(RssFetcher rssFetcher, TopicAssigner topicAssigner) {
         super(rssFetcher, topicAssigner);
     }
 

@@ -12,7 +12,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.List;
-import java.util.Set;
 
 /*
  * HuggingFaceClassifierEngine.java
@@ -21,7 +20,7 @@ import java.util.Set;
  */
 @Component
 @Slf4j
-public class HuggingFaceClassifierEngine implements ClassifierEngine {
+public class HuggingFaceClassifierEngine implements ClassificationEngine {
 
     private static final String API_URL = "https://api-inference.huggingface.co/models/valhalla/distilbart-mnli-12-1";
 
@@ -29,7 +28,7 @@ public class HuggingFaceClassifierEngine implements ClassifierEngine {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Override
-    public String classify(Article article, Set<String> labels) {
+    public String classify(Article article, List<String> labels) {
         String text = article.getTitle() + " " + article.getContent();
 
         try {
