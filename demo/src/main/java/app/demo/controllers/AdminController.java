@@ -99,6 +99,17 @@ public class AdminController {
         }
     }
 
+    @PostMapping("/monitor/cluster")
+    public ResponseEntity<String> startClusterMonitor() {
+        try {
+            adminService.cluster();
+            return ResponseEntity.ok("Cluster monitor started successfully");
+        } catch (Exception e) {
+            log.error("Error starting cluster monitor: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body("An error occurred while starting the cluster monitor: " + e.getMessage());
+        }
+    }
+
     @DeleteMapping("/purge_all")
     public ResponseEntity<String> purgeAllArticles() {
         try {

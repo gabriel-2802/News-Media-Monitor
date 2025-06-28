@@ -40,4 +40,5 @@ public class MonitorService {
         newsSources.clear();
         newsSources.addAll(newsSourceRepository.findAll());
     }
+
 }

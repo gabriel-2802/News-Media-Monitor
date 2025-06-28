@@ -14,10 +14,8 @@ import app.demo.exceptions.TopicAlreadyExistsException;
 import app.demo.exceptions.TopicNotFoundException;
 import app.demo.mappers.NewsSourceMapper;
 import app.demo.mappers.UserMapper;
-import app.demo.repositories.ArticleRepository;
-import app.demo.repositories.NewsSourceRepository;
-import app.demo.repositories.TopicRepository;
-import app.demo.repositories.UserRepository;
+import app.demo.repositories.*;
+import app.demo.services.monitoring.ClusterServiceInterface;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -34,11 +32,12 @@ import java.util.stream.Collectors;
 public class AdminService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
-    private final TopicRepository topicRepository;
     private final NewsSourceMapper newsSourceMapper;
     private final NewsSourceRepository newsSourceRepository;
     private final ArticleRepository articleRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final ArticleClusterRepository articleClusterRepository;
+    private final ClusterServiceInterface clusterService;
 
 
     public List<UserDTO> getAllUsers() {
@@ -89,7 +88,14 @@ public class AdminService {
 
     @Transactional
     public void purgeAll() {
+        List<Article> articles = articleRepository.findAll().stream().peek(a -> a.setCluster(null)).toList();
+        articleRepository.saveAll(articles);
 
+        articleClusterRepository.deleteAll();
+        articleRepository.deleteAll();
     }
 
+    public void cluster() {
+        clusterService.cluster();
+    }
 }

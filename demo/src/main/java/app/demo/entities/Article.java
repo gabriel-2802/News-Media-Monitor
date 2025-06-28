@@ -27,9 +27,6 @@ public class Article {
     @Column(columnDefinition = "TEXT")
     private String summary;
 
-    private String sha256Hash;
-    private long simHash;
-
     @ManyToOne
     private Topic topic;
 
@@ -47,8 +44,6 @@ public class Article {
                 ", url='" + url + '\'' +
                 ", published=" + published +
                 ", summary='" + summary + '\'' +
-                ", sha256Hash='" + sha256Hash + '\'' +
-                ", simHash=" + simHash +
                 ", topic=" + (topic != null ? topic.getName() : "null") +
                 ", cluster=" + (cluster != null ? cluster.getId() : "null") +
                 '}';

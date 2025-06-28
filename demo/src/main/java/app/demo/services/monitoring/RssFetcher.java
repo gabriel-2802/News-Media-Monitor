@@ -2,7 +2,6 @@ package app.demo.services.monitoring;
 
 import app.demo.entities.Article;
 import app.demo.entities.NewsSource;
-import app.demo.services.HashService;
 import com.rometools.rome.feed.synd.SyndEntry;
 import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.io.SyndFeedInput;
@@ -11,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -34,20 +32,29 @@ public class RssFetcher {
     public List<Article> fetchFrom(NewsSource newsSource) {
         List<Article> articles = new ArrayList<>();
 
-        try (XmlReader reader = new XmlReader(URI.create(MORSS_FEED_URL + newsSource.getRssUrl()).toURL())) {
-            SyndFeed feed = new SyndFeedInput().build(reader);
-
+        try  {
+            SyndFeed feed = fetchFrom(MORSS_FEED_URL + newsSource.getRssUrl());
             for (SyndEntry entry : feed.getEntries()) {
                 articles.add(RssMapper.toEntity(entry, newsSource));
             }
-
-        } catch (MalformedURLException e) {
-            log.error(e.getMessage());
         } catch (Exception e) {
-            log.error("Error fetching RSS feed from {}: {}", newsSource.getRssUrl(), e.getMessage(), e);
+            try {
+                // if morss.it fails, try fetching directly from the RSS URL
+                SyndFeed feed = fetchFrom(newsSource.getRssUrl());
+                for (SyndEntry entry : feed.getEntries()) {
+                    articles.add(RssMapper.toEntity(entry, newsSource));
+                }
+            } catch (Exception ex) {
+                log.error("Failed to fetch articles from {}: {}", newsSource.getName(), ex.getMessage());
+            }
         }
 
         return articles;
+    }
+
+    private SyndFeed fetchFrom(String rssUrl) throws MalformedURLException, Exception {
+        XmlReader reader = new XmlReader(URI.create(rssUrl).toURL());
+        return new SyndFeedInput().build(reader);
     }
 
     /*
@@ -62,9 +69,7 @@ public class RssFetcher {
             article.setSource(newsSource.getName());
             article.setUrl(syndEntry.getLink());
             article.setPublished(syndEntry.getPublishedDate() == null ? Date.from(Instant.now()) : syndEntry.getPublishedDate());
-            article.setSummary(syndEntry.getDescription() != null ? syndEntry.getDescription().getValue() : "No description");
-            article.setSha256Hash(HashService.sha256(article.getContent()));
-            article.setSimHash(HashService.simHash(article.getContent()));
+            article.setSummary(syndEntry.getDescription() != null ? syndEntry.getDescription().getValue() : " ");
             return article;
         }
     }
