@@ -1,7 +1,11 @@
 from re import S
 from fastapi import FastAPI
 from pydantic import BaseModel
+from fastapi import Request, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 
+from typing import Optional
 from classifier import NewsClassifier
 from clustering import create_and_save_clusters
 
@@ -16,8 +20,8 @@ class ClassifyRequest(BaseModel):
         text: The article or input string to classify.
         default_topic: Fallback topic in case classification fails.
     """
-    text: str
-    default_topic: str
+    text: Optional[str]
+    default_topic: Optional[str]
 
 
 class ClassifyResponse(BaseModel):
@@ -26,8 +30,7 @@ class ClassifyResponse(BaseModel):
     Attributes:
         topic: Predicted or fallback topic.
     """
-    topic: str
-
+    topic: Optional[str]
 
 @app.post("/classify", response_model=ClassifyResponse)
 def classify(req: ClassifyRequest) -> ClassifyResponse:
@@ -44,6 +47,7 @@ def classify(req: ClassifyRequest) -> ClassifyResponse:
         return ClassifyResponse(topic=topic)
     except Exception as _:
         return ClassifyResponse(topic=req.default_topic)
+
 
 
 @app.post("/cluster")

@@ -68,14 +68,39 @@ The system assigns the label with the highest score to the article.
 
 ## Monitoring Speedup and Efficiency
 
-The article gathering process was parallelized using a Custom ThreadPool Executor to improve the system's throughput when collecting news from multiple sources.
-Moreover, the classifying process was also parallelized using parallel streams to enhance the overall performance of the application.
+### Raw Data
 
-### Speedup Achieved (average results using 4-6-8 threads)
-$$
-\text{Speedup} = \frac{T_{\text{average\_serial}}}{T_{\text{average\_parallel}}} \approx 2.67
+| Threads | Time (s) | Speedup                  | Efficiency (%)              |
+| ------- | -------- | ------------------------ | --------------------------- |
+| 1       | 45.30    | baseline                 | baseline                    |
+| 4       | 30.00    | 45.30 / 30.00 ≈ **1.51** | 1.51 / 4 × 100 ≈ **37.75%** |
+| 6       | 22.00    | 45.30 / 22.00 ≈ **2.06** | 2.06 / 6 × 100 ≈ **34.33%** |
+| 8       | 27.18    | 45.30 / 27.18 ≈ **1.67** | 1.67 / 8 × 100 ≈ **20.88%** |
+
+---
+
+### Summary Statistics
+
+#### Average Speedup:
 
 $$
+\text{Average Speedup} = \frac{1.51 + 2.06 + 1.67}{3} \approx \boxed{1.75}
+$$
+
+#### Average Efficiency:
+
+$$
+\text{Average Efficiency} = \frac{37.75 + 34.33 + 20.88}{3} \approx \boxed{30.99\%}
+$$
+
+---
+
+### Analysis
+
+* **Best performance** is achieved with **6 threads**, which offers the highest speedup (≈ 2.06×) and reasonable efficiency (≈ 34.33%).
+* **8 threads** underperforms due to overhead and likely I/O or CPU contention, leading to decreased efficiency (≈ 20.88%).
+* The **average speedup of 1.75×** shows the system benefits significantly from parallelism.
+* **Average efficiency of \~31%** indicates that while parallelization is effective, it’s subject to diminishing returns due to factors such as thread management overhead and I/O blocking.
 
 
 
