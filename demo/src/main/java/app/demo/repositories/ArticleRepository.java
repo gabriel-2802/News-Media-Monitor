@@ -11,6 +11,8 @@ import java.util.List;
 public interface ArticleRepository extends JpaRepository<Article, Long> {
     List<Article> findByTopic(Topic topic);
 
+    List<Article> findByClusterId(Long clusterId);
+
     @Query(value = """
     SELECT articles.* FROM articles
     INNER JOIN topics ON articles.topic_id = topics.id

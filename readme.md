@@ -1,5 +1,8 @@
 # News Media Monitor
 
+This project is a news monitoring platform that fetches, classifies, and clusters news articles from various sources. It provides a RESTful API for user interaction and administrative tasks, leveraging custom AI models for text classification and clustering.
+
+
 ## News Processing Pipeline Overview
 
 ### RSS Fetching
@@ -29,6 +32,20 @@ The application collects news articles by fetching and parsing RSS feeds from re
   <pubDate>Tue, 25 Jun 2025 14:00:00 GMT</pubDate>
 </item>
 ```
+
+Moreover, the `RssFetcher` uses the 'morss.it` api to fetch additional content for articles that are missing the `content` field. This API enriches the article data by providing full text content when available.
+
+## Classification
+
+Classification can be set up in `application.properties` with the following properties:
+
+```properties
+monitoring.classification-engine=
+```
+
+The allowed values are:
+* `custom` - Uses a fine-tuned BERT model for topic classification.
+* `hf` - Uses a Hugging Face zero-shot classifier for topic classification.
 
 ### Hugging Face Classifier Integration
 
@@ -65,8 +82,40 @@ News articles are semantically classified using a transformer-based zero-shot te
 
 The system assigns the label with the highest score to the article.
 
+### Custom BERT Classifier
+The custom BERT classifier is based on a fine-tuned `bert-base-uncased`. It is trained to predict high-level topics based on the article's `title` and `content`. The training process involved over 20,000 articles, with the model achieving an accuracy of 85% on a held-out test set.
+
+The model is accesible via 'FastAPI` endpoints.
+
+**Sample API Request:**
+```
+{
+  "text": "Article title and body text"
+  "default_topic": " ... "
+}
+```
+
+**Sample API Response:**
+
+```json
+{
+  "topic": "Politics",
+}
+```
+
 
 ## Monitoring Speedup and Efficiency
+
+###  Overview
+
+The application supports configurable parallelism for news monitoring and clustering through an asynchronous task execution strategy. This is controlled by the `monitoring.strategy` property, which can be set to either `async` (enabling multithreaded processing using a thread pool) or `single-threaded` (for sequential execution). When `async` is enabled, the task execution is handled by a configurable `ThreadPoolExecutor`, with the following properties:
+
+```properties
+monitoring.async.core-pool-size=6
+monitoring.async.max-pool-size=10
+monitoring.async.queue-capacity=100
+```
+
 
 ### Raw Data
 
@@ -93,7 +142,6 @@ $$
 \text{Average Efficiency} = \frac{37.75 + 34.33 + 20.88}{3} \approx \boxed{30.99\%}
 $$
 
----
 
 ### Analysis
 
@@ -162,10 +210,8 @@ USING gin(to_tsvector('english', title || ' ' || content));
 
 This index maps each word in the dataset to the rows where it appears, enabling fast search even over large text fields.
 
-Here's the technical section in **Markdown format (`README.md`)** without emojis, suitable for placing inside your `ai_models/` folder:
 
-
-### Custom AI Services (`ai_models/`)
+## Custom AI Services (`ai_models/`)
 
 This module implements the core AI functionality for the News Media Monitor platform. It includes:
 
@@ -175,9 +221,8 @@ This module implements the core AI functionality for the News Media Monitor plat
 
 The FastAPI service runs independently and is accessed by the main Spring Boot backend application via HTTP. 
 
----
 
-#### 1. Text Classification
+### 1. Text Classification
 
 - The classifier is based on a fine-tuned `bert-base-uncased` model using Hugging Face Transformers.
 - It is trained to predict high-level topics based on article `title` and `content`.
@@ -191,9 +236,8 @@ The FastAPI service runs independently and is accessed by the main Spring Boot b
 * Input: Raw article text (title + description + content)
 * Output: Predicted topic label
 
----
 
-#### 2. Embeddings and Clustering
+### 2. Embeddings and Clustering
 
 * Embeddings are generated using a pretrained SentenceTransformer model.
 * Each article is transformed into a dense vector representation.
@@ -205,9 +249,8 @@ Key features:
 * Scalable clustering and similarity detection between articles
 * Suitable for comparing large sets of articles over time
 
----
 
-#### 3. FastAPI Endpoints
+### 3. FastAPI Endpoints
 
 The service exposes the following endpoints on `http://localhost:8000`:
 
@@ -218,17 +261,16 @@ The service exposes the following endpoints on `http://localhost:8000`:
 
 ---
 
-#### Integration Notes
+### Integration Notes
 
 * The Python FastAPI service runs as a container alongside the Spring Boot app.
 * The folder `ai_models/` is mounted into the container, enabling live development.
 
+## API Documentation
 
----
+### Authentication Endpoints
 
-### API Documentation
-
-### POST `/api/auth/register`
+#### POST `/api/auth/register`
 
 Registers a new user.
 
@@ -270,7 +312,7 @@ Registers a new user.
 
 ---
 
-### POST `/api/auth/login`
+#### POST `/api/auth/login`
 
 Authenticates a user and returns an authentication token.
 
@@ -312,9 +354,14 @@ Authenticates a user and returns an authentication token.
 
 ---
 
-### GET `/api/feed/topics`
+### ADMIN Endpoints
 
-Returns all available topics.
+Requires `ADMIN` role for access.
+
+
+#### GET `/api/admin/users`
+
+Retrieves all registered users.
 
 **Responses:**
 
@@ -323,12 +370,14 @@ Returns all available topics.
   ```json
   [
     {
-      "id": 1,
-      "name": "Politics"
+      "username": "admin",
+      "email": "admin@example.com",
+      "roles": ["ADMIN"]
     },
     {
-      "id": 2,
-      "name": "Technology"
+      "username": "john_doe",
+      "email": "john@example.com",
+      "roles": ["USER"]
     }
   ]
   ```
@@ -339,40 +388,13 @@ Returns all available topics.
   null
   ```
 
----
+#### GET `/api/admin/users/{username}`
 
-### GET `/api/admin/users`
-
-Returns all users.
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  [
-    {
-      "username": "john_doe",
-      "email": "john@example.com",
-      "roles": ["USER"]
-    },
-    {
-      "username": "admin",
-      "email": "admin@example.com",
-      "roles": ["ADMIN"]
-    }
-  ]
-  ```
-
----
-
-### GET `/api/admin/users/{username}`
-
-Returns user details by username.
+Fetches information for a specific user.
 
 **Path Parameter:**
 
-* `username` (String)
+* `username` (String): The username to look up.
 
 **Responses:**
 
@@ -392,11 +414,16 @@ Returns user details by username.
   null
   ```
 
----
+* **500 Internal Server Error**
 
-### DELETE `/api/admin/users/{username}`
+  ```json
+  null
+  ```
 
-Deletes a user by username.
+
+#### DELETE `/api/admin/users/{username}`
+
+Deletes a user from the system.
 
 **Path Parameter:**
 
@@ -419,62 +446,12 @@ Deletes a user by username.
 * **500 Internal Server Error**
 
   ```
-  An error occurred while deleting the user: {error message}
+  An error occurred while deleting the user {username}
   ```
 
----
+#### POST `/api/admin/news_source`
 
-### POST `/api/admin/topic/{topicName}`
-
-Creates a new topic.
-
-**Path Parameter:**
-
-* `topicName` (String)
-
-**Responses:**
-
-* **200 OK**
-
-  ```
-  Topic created successfully
-  ```
-
-* **409 Conflict**
-
-  ```
-  Topic already exists
-  ```
-
----
-
-### DELETE `/api/admin/topic/{topicName}`
-
-Deletes a topic.
-
-**Path Parameter:**
-
-* `topicName` (String)
-
-**Responses:**
-
-* **200 OK**
-
-  ```
-  Topic deleted successfully
-  ```
-
-* **500 Internal Server Error**
-
-  ```
-  An error occurred while deleting the topic: {error message}
-  ```
-
----
-
-### POST `/api/admin/news_source`
-
-Creates a new news source.
+Adds a new news source for monitoring.
 
 **Request Body:**
 
@@ -505,11 +482,16 @@ Creates a new news source.
   null
   ```
 
----
+* **500 Internal Server Error**
 
-### DELETE `/api/admin/news_source/{id}`
+  ```json
+  null
+  ```
 
-Deletes a news source.
+
+#### DELETE `/api/admin/news_source/{id}`
+
+Deletes a news source by its ID.
 
 **Path Parameter:**
 
@@ -519,25 +501,119 @@ Deletes a news source.
 
 * **200 OK**
 
-  ```
-  News source deleted successfully
+  ```json
+  {
+    "id": 4,
+    "name": "BBC",
+    "baseUrl": "https://www.bbc.com",
+    "rssUrl": "https://feeds.bbci.co.uk/news/rss.xml"
+  }
   ```
 
 * **404 Not Found**
 
+  ```json
+  null
   ```
-  Invalid or non-existent ID
+
+* **500 Internal Server Error**
+
+  ```json
+  null
+  ```
+
+
+#### POST `/api/admin/monitor/start`
+
+Starts the article fetching process from all news sources.
+
+**Responses:**
+
+* **200 OK**
+
+  ```
+  Monitor started successfully
   ```
 
 * **500 Internal Server Error**
 
   ```
-  An error occurred while deleting the news source: {error message}
+  An error occurred while starting the monitor: {error message}
+  ```
+
+
+#### POST `/api/admin/monitor/cluster`
+
+Starts the clustering process for previously collected articles.
+
+**Responses:**
+
+* **200 OK**
+
+  ```
+  Cluster monitor started successfully
+  ```
+
+* **500 Internal Server Error**
+
+  ```
+  An error occurred while starting the cluster monitor: {error message}
+  ```
+
+
+#### DELETE `/api/admin/purge_all`
+
+Deletes all stored articles in the system.
+
+**Responses:**
+
+* **200 OK**
+
+  ```
+  All articles deleted successfully
+  ```
+
+* **500 Internal Server Error**
+
+  ```
+  An error occurred while deleting all articles: {error message}
   ```
 
 ---
+### Feed Endpoints
 
-### GET `/api/admin/news_sources`
+Requires no authentication for access.
+
+#### GET `/api/feed/topics`
+
+Retrieves a list of all available topics.
+
+**Responses:**
+
+* **200 OK**
+
+  ```json
+  [
+    {
+      "id": 1,
+      "name": "Politics"
+    },
+    {
+      "id": 2,
+      "name": "Technology"
+    }
+  ]
+  ```
+
+* **500 Internal Server Error**
+
+  ```json
+  null
+  ```
+
+
+
+#### GET `/api/feed/news_sources`
 
 Returns all registered news sources.
 
@@ -562,23 +638,254 @@ Returns all registered news sources.
   ]
   ```
 
----
+* **500 Internal Server Error**
 
-### POST `/api/admin/monitor/start`
+  ```json
+  null
+  ```
 
-Manually starts the monitoring process.
+
+
+#### GET `/api/feed/articles`
+
+Returns all available articles.
 
 **Responses:**
 
 * **200 OK**
 
+  ```json
+  [
+    {
+      "id": 101,
+      "title": "Economic Forecast Released",
+      "content": "Details about economic report...",
+      "topicName": "Economy",
+      "sourceName": "Reuters"
+    },
+    ...
+  ]
   ```
-  Monitor started successfully
+
+* **500 Internal Server Error**
+
+  ```json
+  null
+  ```
+
+
+#### GET `/api/feed/articles/{topicName}`
+
+Returns articles filtered by topic name.
+
+**Path Parameter:**
+
+* `topicName` (String): Name of the topic.
+
+**Responses:**
+
+* **200 OK**
+
+  ```json
+  [
+    {
+      "id": 202,
+      "title": "New Tech Innovations",
+      "content": "Highlights from tech summit...",
+      "topicName": "Technology",
+      "sourceName": "Wired"
+    }
+  ]
+  ```
+
+* **404 Not Found**
+
+  ```json
+  null
+  ```
+
+* **500 Internal Server Error**
+
+  ```json
+  null
+  ```
+
+
+
+#### GET `/api/feed/articles/by_cluster/{clusterId}`
+
+Retrieves all articles that belong to a specific cluster.
+
+**Path Parameter:**
+
+* `clusterId` (Long): Cluster identifier.
+
+**Responses:**
+
+* **200 OK**
+
+  ```json
+  [
+    {
+      "id": 301,
+      "title": "Climate Policy Agreement Reached",
+      "clusterId": 5,
+      "topicName": "Environment"
+    },
+    ...
+  ]
+  ```
+
+* **500 Internal Server Error**
+
+  ```json
+  null
+  ```
+
+
+#### POST `/api/feed/search`
+
+Searches for articles based on full-text input.
+
+**Request Body:**
+
+```json
+{
+  "query": "energy crisis",
+  "filters": {
+    "topics": ["Politics", "Environment"],
+    "sources": ["BBC"]
+  }
+}
+```
+
+**Responses:**
+
+* **200 OK**
+
+  ```json
+  [
+    {
+      "id": 400,
+      "title": "Energy Crisis Deepens",
+      "content": "Europe faces new energy concerns...",
+      "topicName": "Politics",
+      "sourceName": "BBC"
+    }
+  ]
+  ```
+
+* **500 Internal Server Error**
+
+  ```json
+  null
+  ```
+
+--- 
+### User Endpoints
+
+
+Requires authentication via JWT for all endpoints.
+
+#### GET `/api/user/profile/{username}`
+
+Retrieves the authenticated user's profile.
+
+**Path Parameter:**
+
+* `username` (String): Must match the currently authenticated user.
+
+**Authentication:** Required (JWT)
+
+**Responses:**
+
+* **200 OK**
+
+  ```json
+  {
+    "username": "john_doe",
+    "email": "john@example.com",
+    "roles": ["USER"]
+  }
+  ```
+
+* **403 Forbidden**
+
+  ```
+  null
+  ```
+
+* **404 Not Found**
+
+  ```
+  null
   ```
 
 * **500 Internal Server Error**
 
   ```
-  An error occurred while starting the monitor: {error message}
+  null
   ```
+
+
+
+#### POST `/api/user/subscribe/{topicId}`
+
+Subscribes the authenticated user to a specific topic.
+
+**Path Parameter:**
+
+* `topicId` (Long): ID of the topic to subscribe to.
+
+**Authentication:** Required (JWT)
+
+**Responses:**
+
+* **200 OK**
+
+  ```json
+  {
+    "id": 3,
+    "name": "Technology"
+  }
+  ```
+
+* **404 Not Found**
+
+  ```
+  null
+  ```
+
+* **409 Conflict**
+
+  ```
+  null
+  ```
+
+* **500 Internal Server Error**
+
+  ```
+  null
+  ```
+
+
+#### DELETE `/api/user/unsubscribe/{topicId}`
+
+Unsubscribes the authenticated user from a specific topic.
+
+**Path Parameter:**
+
+* `topicId` (Long): ID of the topic to unsubscribe from.
+
+**Authentication:** Required (JWT)
+
+**Responses:**
+
+* **204 No Content**
+
+* **404 Not Found**
+
+* **500 Internal Server Error**
+
+---
 

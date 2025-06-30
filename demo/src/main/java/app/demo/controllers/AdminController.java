@@ -29,7 +29,6 @@ import java.util.List;
 @Slf4j
 public class AdminController {
     private final AdminService adminService;
-    private final MonitorService monitorService;
 
     @GetMapping("/users")
     ResponseEntity<List<UserDTO>> getAllUsers() {
@@ -96,7 +95,7 @@ public class AdminController {
     @PostMapping("/monitor/start")
     public ResponseEntity<String> startMonitor() {
         try {
-            monitorService.startMonitoring();
+            adminService.startMonitoring();
             return ResponseEntity.ok("Monitor started successfully");
         } catch (Exception e) {
             log.error("Error starting monitor: {}", e.getMessage(), e);

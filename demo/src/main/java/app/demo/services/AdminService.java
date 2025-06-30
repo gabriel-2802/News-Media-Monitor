@@ -12,6 +12,7 @@ import app.demo.mappers.NewsSourceMapper;
 import app.demo.mappers.UserMapper;
 import app.demo.repositories.*;
 import app.demo.services.monitoring.ClusterService;
+import app.demo.services.monitoring.MonitorService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -33,6 +34,7 @@ public class AdminService {
     private final ApplicationEventPublisher eventPublisher;
     private final ArticleClusterRepository articleClusterRepository;
     private final ClusterService clusterService;
+    private final MonitorService monitorService;
 
 
     public List<UserDTO> getAllUsers() {
@@ -88,6 +90,11 @@ public class AdminService {
 
         articleClusterRepository.deleteAll();
         articleRepository.deleteAll();
+    }
+
+    @Transactional
+    public void startMonitoring() {
+        monitorService.startMonitoring();
     }
 
     public void cluster() {

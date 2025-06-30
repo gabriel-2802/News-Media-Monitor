@@ -84,4 +84,15 @@ public class FeedController {
             return ResponseEntity.status(500).body(null);
         }
     }
+
+    @GetMapping("/articles/by_cluster/{clusterId}")
+    ResponseEntity<List<ArticleDTO>> getArticlesByCluster(@PathVariable Long clusterId) {
+        try {
+            List<ArticleDTO> articles = feedService.getArticlesByClusterId(clusterId);
+            return ResponseEntity.ok(articles);
+        } catch (Exception e) {
+            log.error("Error retrieving articles by cluster: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(null);
+        }
+    }
 }

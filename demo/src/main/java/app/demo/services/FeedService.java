@@ -98,6 +98,16 @@ public class FeedService {
             articles.removeIf(article -> !article.getSource().equals(sourceName));
         }
     }
+
+    public List<ArticleDTO> getArticlesByClusterId(Long clusterId) {
+        if (clusterId == null) {
+            return new ArrayList<>();
+        }
+        return articleRepository.findByClusterId(clusterId).stream()
+                .sorted(Comparator.comparing(Article::getPublished))
+                .map(articleMapper::toDTO)
+                .collect(Collectors.toList());
+    }
 }
 
 
