@@ -24,14 +24,13 @@ import java.util.stream.Collectors;
 public class TopicAssigner {
     private final ClassificationEngine classifierEngine;
     private final TopicRepository topicRepository;
-    private final Map<String, Topic> topicMap;
-    List<String> topicNames;
+    private Map<String, Topic> topicMap;
+    private List<String> topicNames;
 
     public TopicAssigner(ClassificationEngine classifierEngine, TopicRepository topicRepository) {
         this.classifierEngine = classifierEngine;
         this.topicRepository = topicRepository;
-        this.topicMap = getAvailableTopics();
-        this.topicNames = topicMap.keySet().stream().toList();
+        setTopics();
     }
 
     @EventListener
@@ -39,10 +38,11 @@ public class TopicAssigner {
         log.info("Received TopicRepositoryChangeEvent, updating topic map.");
         if (event.isDeleted()) {
             topicMap.remove(event.topic().getName());
+            topicNames.remove(event.topic().getName());
         } else {
             topicMap.put(event.topic().getName(), event.topic());
+            topicNames.add(event.topic().getName());
         }
-        topicNames = topicMap.keySet().stream().toList();
     }
 
     public void assignTopic(Article article) {
@@ -56,10 +56,9 @@ public class TopicAssigner {
         article.setTopic(topicMap.get(predictedTopic));
     }
 
-    private Map<String, Topic> getAvailableTopics() {
-        return topicRepository.findAllOrdered().stream()
-                .collect(Collectors.toMap(Topic::getName, topic -> topic));
+    private void setTopics() {
+        var topics = topicRepository.findAllOrdered();
+        topicNames = topics.stream().map(Topic::getName).toList();
+        topicMap = topics.stream().collect(Collectors.toMap(Topic::getName, topic -> topic));
     }
-
-
 }

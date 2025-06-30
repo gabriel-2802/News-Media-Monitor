@@ -13,7 +13,7 @@ import java.net.http.HttpRequest;
  */
 @Service
 @Slf4j
-public class ClusterServiceV1 implements ClusterServiceInterface {
+public class ClusterServiceV1 implements ClusterService {
     private static final String CLUSTERING_URL = "http://localhost:8000/cluster";
     private final HttpClient httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 

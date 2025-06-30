@@ -4,18 +4,14 @@ import app.demo.dto.NewsSourceDTO;
 import app.demo.dto.UserDTO;
 import app.demo.entities.Article;
 import app.demo.entities.NewsSource;
-import app.demo.entities.Topic;
 import app.demo.entities.User;
 import app.demo.events.NewsSourceRepoChangeEvent;
-import app.demo.events.TopicRepositoryChangeEvent;
 import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.SourceNotExisting;
-import app.demo.exceptions.TopicAlreadyExistsException;
-import app.demo.exceptions.TopicNotFoundException;
 import app.demo.mappers.NewsSourceMapper;
 import app.demo.mappers.UserMapper;
 import app.demo.repositories.*;
-import app.demo.services.monitoring.ClusterServiceInterface;
+import app.demo.services.monitoring.ClusterService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -24,7 +20,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 
 @Service
@@ -37,7 +32,7 @@ public class AdminService {
     private final ArticleRepository articleRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final ArticleClusterRepository articleClusterRepository;
-    private final ClusterServiceInterface clusterService;
+    private final ClusterService clusterService;
 
 
     public List<UserDTO> getAllUsers() {
