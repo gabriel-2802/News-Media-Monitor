@@ -4,11 +4,10 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y build-essential
 
-COPY ai_models/requirements.txt .
-
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ai_models/ .
+COPY . .
 
 EXPOSE 8000
 
