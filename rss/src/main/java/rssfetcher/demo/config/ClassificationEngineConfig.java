@@ -1,11 +1,11 @@
-package app.demo.config;
+package rssfetcher.demo.config;
 
-import app.demo.services.monitoring.engines.ClassificationEngine;
-import app.demo.services.monitoring.engines.CustomApiClassifierEngine;
-import app.demo.services.monitoring.engines.HuggingFaceClassifierEngine;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import rssfetcher.demo.services.engines.ClassificationEngine;
+import rssfetcher.demo.services.engines.CustomApiClassifierEngine;
+import rssfetcher.demo.services.engines.HuggingFaceClassifierEngine;
 
 /**
  * configuration class that provides a {@link ClassificationEngine} bean

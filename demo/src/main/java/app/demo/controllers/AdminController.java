@@ -5,7 +5,6 @@ import app.demo.dto.UserDTO;
 import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.SourceNotExisting;
 import app.demo.services.AdminService;
-import app.demo.services.monitoring.MonitorService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -89,28 +88,6 @@ public class AdminController {
         } catch (Exception e) {
             log.error("Error deleting news source: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(null);
-        }
-    }
-
-    @PostMapping("/monitor/start")
-    public ResponseEntity<String> startMonitor() {
-        try {
-            adminService.startMonitoring();
-            return ResponseEntity.ok("Monitor started successfully");
-        } catch (Exception e) {
-            log.error("Error starting monitor: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body("An error occurred while starting the monitor: " + e.getMessage());
-        }
-    }
-
-    @PostMapping("/monitor/cluster")
-    public ResponseEntity<String> startClusterMonitor() {
-        try {
-            adminService.cluster();
-            return ResponseEntity.ok("Cluster monitor started successfully");
-        } catch (Exception e) {
-            log.error("Error starting cluster monitor: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body("An error occurred while starting the cluster monitor: " + e.getMessage());
         }
     }
 

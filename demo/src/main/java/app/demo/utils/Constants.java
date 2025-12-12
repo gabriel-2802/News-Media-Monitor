@@ -1,5 +1,4 @@
-package app.demo.security;
-import io.jsonwebtoken.SignatureAlgorithm;
+package app.demo.utils;
 import io.jsonwebtoken.security.Keys;
 
 import javax.crypto.SecretKey;
@@ -10,5 +9,8 @@ public class Constants {
     private static final String secret = "mysecretkeymysecretkeymysecretkeymysecretkeymysecretkeymysecretmysecretkey";
     public static final SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     public static final long ADMIN_REGISTER_CODE = 282828282L;
-    public static final String HF_TOKEN = "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";
+    public static final String ADMIN = "ADMIN";
+    public static final String USER = "USER";
+    public static final String ADMIN_ENDPOINT = "/api/admin/**";
+    public static final String USER_ENDPOINT = "/api/user/**";
 }

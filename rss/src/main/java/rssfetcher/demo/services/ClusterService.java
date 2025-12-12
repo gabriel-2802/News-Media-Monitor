@@ -1,4 +1,4 @@
-package app.demo.services.monitoring;
+package rssfetcher.demo.services;
 
 /**
  * service interface for clustering articles stored in the database.

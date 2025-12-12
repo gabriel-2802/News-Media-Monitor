@@ -1,8 +1,6 @@
-package app.demo.events;
+package rssfetcher.demo.events;
 
-import app.demo.entities.Topic;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import rssfetcher.demo.entities.Topic;
 
 /**
  * event representing a change in the topic repository.

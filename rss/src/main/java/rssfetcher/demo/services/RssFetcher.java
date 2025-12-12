@@ -1,7 +1,5 @@
-package app.demo.services.monitoring;
+package rssfetcher.demo.services;
 
-import app.demo.entities.Article;
-import app.demo.entities.NewsSource;
 import com.rometools.rome.feed.synd.SyndEntry;
 import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.io.SyndFeedInput;
@@ -10,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
+import rssfetcher.demo.entities.Article;
+import rssfetcher.demo.entities.NewsSource;
 
 import java.net.MalformedURLException;
 import java.net.URI;

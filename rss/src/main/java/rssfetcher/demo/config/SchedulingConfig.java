@@ -1,4 +1,4 @@
-package app.demo.config;
+package rssfetcher.demo.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;

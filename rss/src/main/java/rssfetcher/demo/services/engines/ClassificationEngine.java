@@ -1,6 +1,6 @@
-package app.demo.services.monitoring.engines;
+package rssfetcher.demo.services.engines;
 
-import app.demo.entities.Article;
+import rssfetcher.demo.entities.Article;
 
 import java.util.List;
 

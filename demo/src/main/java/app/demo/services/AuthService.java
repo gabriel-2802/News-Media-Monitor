@@ -12,7 +12,7 @@ import app.demo.exceptions.ResourceNotFoundException;
 import app.demo.mappers.UserMapper;
 import app.demo.repositories.RoleRepository;
 import app.demo.repositories.UserRepository;
-import app.demo.security.Constants;
+import app.demo.utils.Constants;
 import app.demo.security.JWTGenerator;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +23,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
 import java.util.Set;
 
 @Service

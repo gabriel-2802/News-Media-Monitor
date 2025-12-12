@@ -16,11 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Objects;
 
 /**
- * rest controller that handles user account operations such as viewing profiles and managing topic subscriptions.
- *
- * <p>
- * provides authenticated users with endpoints to access their profile and subscribe or unsubscribe from topics.
- * </p>
+ * Rest controller that handles user account operations such as viewing profiles and managing topic subscriptions.
  */
 @Controller
 @RequestMapping("/api/user")

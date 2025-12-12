@@ -1,13 +1,13 @@
-package app.demo.services.monitoring;
+package rssfetcher.demo.services;
 
-import app.demo.entities.Article;
-import app.demo.entities.Topic;
-import app.demo.events.TopicRepositoryChangeEvent;
-import app.demo.repositories.TopicRepository;
-import app.demo.services.monitoring.engines.ClassificationEngine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import rssfetcher.demo.entities.Article;
+import rssfetcher.demo.entities.Topic;
+import rssfetcher.demo.events.TopicRepositoryChangeEvent;
+import rssfetcher.demo.repositories.TopicRepository;
+import rssfetcher.demo.services.engines.ClassificationEngine;
 
 import java.util.List;
 import java.util.Map;
@@ -61,4 +61,5 @@ public class TopicAssigner {
         topicNames = topics.stream().map(Topic::getName).toList();
         topicMap = topics.stream().collect(Collectors.toMap(Topic::getName, topic -> topic));
     }
+
 }

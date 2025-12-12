@@ -1,11 +1,11 @@
-package app.demo.services.monitoring.engines;
+package rssfetcher.demo.services.engines;
 
-import app.demo.entities.Article;
-import app.demo.security.Constants;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import rssfetcher.demo.entities.Article;
+import rssfetcher.demo.utils.Constants;
 
 import java.net.URI;
 import java.net.http.HttpClient;
