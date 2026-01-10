@@ -37,6 +37,10 @@ check_worker:
 	docker service logs -f --timestamps newsmonitor_rss_worker \
 	| sed 's/^/\x1b[36m[RSS]\x1b[0m /'
 
+check_ai:
+	docker service logs -f --timestamps newsmonitor_ai_service \
+	| sed 's/^/\x1b[35m[AI]\x1b[0m /'
+
 
 check:
 	docker stack services newsmonitor

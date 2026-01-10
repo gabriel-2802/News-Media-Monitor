@@ -178,3 +178,31 @@ WHERE NOT EXISTS (SELECT 1 FROM topics WHERE name = 'world news');
 INSERT INTO topics (name)
 SELECT 'worldpost'
 WHERE NOT EXISTS (SELECT 1 FROM topics WHERE name = 'worldpost');
+
+CREATE TABLE IF NOT EXISTS monitoring_jobs (
+  id           BIGSERIAL PRIMARY KEY,
+  rss_url      TEXT NOT NULL,
+
+  status       TEXT NOT NULL DEFAULT 'pending',   -- pending | processing | done | failed
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  locked_by    TEXT,
+  locked_at    TIMESTAMPTZ,
+  attempts     INT NOT NULL DEFAULT 0,
+  last_error   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_pending
+  ON monitoring_jobs (status, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_rss_url
+  ON monitoring_jobs (rss_url);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_rss_url_active
+ON monitoring_jobs (rss_url)
+WHERE status IN ('pending', 'processing');
+
+CREATE INDEX IF NOT EXISTS idx_jobs_pending_created_at
+ON monitoring_jobs (created_at, id)
+WHERE status = 'pending';

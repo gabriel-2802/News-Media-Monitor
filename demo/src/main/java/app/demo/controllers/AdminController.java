@@ -5,6 +5,7 @@ import app.demo.dto.UserDTO;
 import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.SourceNotExisting;
 import app.demo.services.AdminService;
+import app.demo.services.MonitoringService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ import java.util.List;
 @Slf4j
 public class AdminController {
     private final AdminService adminService;
+    private final MonitoringService monitoringService;
 
     @GetMapping("/users")
     ResponseEntity<List<UserDTO>> getAllUsers() {
@@ -99,6 +101,28 @@ public class AdminController {
         } catch (Exception e) {
             log.error("Error deleting all articles: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body("An error occurred while deleting all articles: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/create_jobs")
+    public ResponseEntity<String> createMonitoringJobs() {
+        try {
+            int res = monitoringService.createMonitoringJobs();
+            return ResponseEntity.ok("Created " + res + " monitoring jobs successfully");
+        } catch (Exception e) {
+            log.error("Error creating monitoring jobs: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body("An error occurred while creating monitoring jobs: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/cluster")
+    public ResponseEntity<String> triggerClustering() {
+        try {
+            monitoringService.triggerClustering();
+            return ResponseEntity.ok("Clustering process triggered successfully");
+        } catch (Exception e) {
+            log.error("Error triggering clustering: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body("An error occurred while triggering clustering: " + e.getMessage());
         }
     }
 }

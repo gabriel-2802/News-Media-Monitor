@@ -17,7 +17,7 @@ services:
       restart_policy:
         condition: on-failure
 
-  ai_service:
+  ai_service: 
     image: ai_service:latest           # <-- IMPORTANT
     ports:
       - "8002:8000"
@@ -42,6 +42,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: admin
       WORKER_INDEX: "{{.Task.Slot}}"
       WORKER_COUNT: 3
+      CLASSIFICATION_API_URL: http://ai_service:8000/classify
     networks:
       - internal
     deploy:
@@ -58,6 +59,7 @@ services:
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
       AI_SERVICE_URL: http://ai_service:8000
+      CLUSTERING_API_URL: http://ai_service:8000/cluster
     networks:
       - internal
     deploy:

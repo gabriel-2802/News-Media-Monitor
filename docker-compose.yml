@@ -37,13 +37,14 @@ services:
       context: ./rss
       dockerfile: Dockerfile
     deploy:
-      replicas: 3
+      replicas: 1
+    hostname: "rss-{{.Task.Slot}}"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/news_monitor_db
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: admin
       WORKER_INDEX: "{{.Task.Slot}}"
-      WORKER_COUNT: 3
+      WORKER_COUNT: 1
     networks:
       - internal
 

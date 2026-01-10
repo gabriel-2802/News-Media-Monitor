@@ -1,18 +1,21 @@
 package rssfetcher.demo.services;
 
-import org.springframework.context.event.EventListener;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import rssfetcher.demo.entities.Article;
 import rssfetcher.demo.entities.NewsSource;
-import rssfetcher.demo.events.NewsSourceRepoChangeEvent;
 import rssfetcher.demo.repositories.ArticleRepository;
 import rssfetcher.demo.repositories.NewsSourceRepository;
+import rssfetcher.demo.services.monitor.RssFetcher;
+import rssfetcher.demo.services.monitor.TopicAssigner;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
+@Slf4j
 public class MonitorService {
     protected final ArticleRepository articleRepository;
     protected final NewsSourceRepository newsSourceRepository;
@@ -26,21 +29,20 @@ public class MonitorService {
         this.topicAssigner = topicAssigner;
     }
 
-    public void startMonitoring() {
-        var articles = monitor(newsSourceRepository.findAll());
-        try {
-            articleRepository.saveAll(articles);
-        } catch (DataIntegrityViolationException ignored) {}
-    }
-
-    private List<Article> monitor(List<NewsSource> newsSources) {
-        List<Article> articles = new ArrayList<>();
-        for (NewsSource newsSource : newsSources) {
-            List<Article> fetchedArticles = rssFetcher.fetchFrom(newsSource);
-            fetchedArticles.forEach(topicAssigner::assignTopic);
-            articles.addAll(fetchedArticles);
+    @Transactional
+    public void processRssUrl(String rssUrl) {
+        Optional<NewsSource> ns = newsSourceRepository.findByRssUrl(rssUrl);
+        if (ns.isEmpty()) {
+            return;
         }
-        return articles;
-    }
 
+        List<Article> fetchedArticles = rssFetcher.fetchFrom(ns.get());
+        fetchedArticles.forEach(topicAssigner::assignTopic);
+
+        try {
+            articleRepository.saveAll(fetchedArticles);
+        } catch (DataIntegrityViolationException ignored) {
+            log.error("Something went wrong when saving articles from RSS URL: {}", rssUrl);
+        }
+    }
 }

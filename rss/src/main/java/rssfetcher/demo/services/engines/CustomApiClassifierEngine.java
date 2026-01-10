@@ -1,32 +1,36 @@
 package rssfetcher.demo.services.engines;
 
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestTemplate;
 import rssfetcher.demo.entities.Article;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Classifier engine that delegates topic prediction to an external HTTP API
  */
-@Component
 @Slf4j
 public class CustomApiClassifierEngine implements ClassificationEngine {
-    private static final String API_URL = "http://localhost:8000/classify";
-    private final HttpClient httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final String apiUrl;
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    public CustomApiClassifierEngine(String apiUrl) {
+        this.apiUrl = apiUrl;
+        log.info("CustomApiClassifierEngine initialized with API URL: {}", apiUrl);
+    }
 
     @Override
     public String classify(Article article, List<String> topics) {
         try {
+            log.info("Starting classification for article: {}", article.getTitle());
+            log.info("Using API URL: {}", apiUrl);
+
             // the default topic is first by convention
             String defaultTopic = topics.getFirst();
 
@@ -36,33 +40,34 @@ public class CustomApiClassifierEngine implements ClassificationEngine {
                     "default_topic", defaultTopic
             );
 
-            String json = objectMapper.writeValueAsString(requestBody);
+            log.info("Request payload: {}", requestBody);
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(API_URL))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(json))
-                    .build();
+            // Set headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
 
-            // send request and get response
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpEntity<Map<String, String>> request = new HttpEntity<>(requestBody, headers);
 
-            if (response.statusCode() == 200) {
-                ClassificationResponse responseBody = objectMapper.readValue(response.body(), ClassificationResponse.class);
-                return responseBody.topic();
+            log.info("Sending request to: {}", apiUrl);
+            // Send POST request
+            ResponseEntity<ClassificationResponse> response = restTemplate.postForEntity(
+                    apiUrl,
+                    request,
+                    ClassificationResponse.class
+            );
 
+            log.info("Received response with status: {}", response.getStatusCode());
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                String topic = response.getBody().topic();
+                log.info("Classification successful: {}", topic);
+                return topic;
             } else {
-                log.error("Failed to classify article. Status: {}, Payload: {}, err: {}",
-                        response.statusCode(),
-                        json,
-                        response.body());
-                log.error("Sent request is {}", request);
-
+                log.error("Failed to classify article. Status: {}, Body: {}",
+                        response.getStatusCode(), response.getBody());
             }
-        } catch (IOException | InterruptedException e) {
-            log.error("Failed to classify article due to connection ", e);
         } catch (Exception e) {
-            log.error("Unexpected error during classification: {}", e.getMessage());
+            log.error("Error during classification: {} - {}", e.getClass().getName(), e.getMessage(), e);
         }
 
         return null;
