@@ -29,8 +29,8 @@ DB_CONFIG = {
 
 # indexing parameters
 BATCH_SIZE = 100
-K_NEIGHBOURS = 10
-THRESHOLD = 0.65
+K_NEIGHBOURS = 20
+THRESHOLD = 0.85
 
 
 def fetch_articles_batch(batch_size: int) -> Generator[List[ArticleRow], None, None]:
@@ -82,44 +82,48 @@ def embed_batch(articles: List[ArticleRow]) -> Tuple[List[int], np.ndarray]:
     return ids, np.array(embeddings, dtype=np.float32)
 
 
-def cluster_embeddings(ids: List[int], embeddings: np.ndarray, threshold: float = 0.8, k_neighbours: int = 10) -> Dict[int, List[int]]:
-    """Cluster embeddings based on cosine similarity using FAISS.
-
-    Args:
-        ids: List of article IDs.
-        embeddings: Matrix of article embeddings.
-        threshold: Minimum similarity score to consider two articles in the same cluster.
-        k_neighbours: Number of neighbors to query per embedding.
-
-    Returns:
-        A dictionary mapping cluster ID to list of article IDs in that cluster.
-    """
+def cluster_embeddings(
+    ids: List[int],
+    embeddings: np.ndarray,
+    threshold: float = 0.85,
+    k_neighbours: int = 20  
+) -> Dict[int, List[int]]:
     embeddings = embeddings.astype(np.float32)
-
+    faiss.normalize_L2(embeddings)
     dim = embeddings.shape[1]
     index = faiss.IndexFlatIP(dim)
-    index.add(embeddings)  # type: ignore
-
+    index.add(embeddings)
+    
+    # build similarity graph
+    sims, neighbors = index.search(embeddings, k_neighbours)
+    
     visited = np.zeros(len(embeddings), dtype=bool)
-    cluster_id = 0
     clusters: Dict[int, List[int]] = {}
-
+    cluster_id = 0
+    
     for i in range(len(embeddings)):
         if visited[i]:
             continue
-
-        sims, neighbor_indices = index.search(embeddings[i:i+1], k_neighbours)  # type: ignore
+        
+        # BFS to find connected component
+        queue = [i]
         current_cluster = []
-
-        for j, sim in zip(neighbor_indices[0], sims[0]):
-            if sim >= threshold and not visited[j]:
-                current_cluster.append(ids[j])
-                visited[j] = True
-
-        if current_cluster:
+        visited[i] = True
+        
+        while queue:
+            node = queue.pop(0)
+            current_cluster.append(ids[node])
+            
+            # Add unvisited neighbors above threshold
+            for neighbor_idx, sim in zip(neighbors[node], sims[node]):
+                if sim >= threshold and not visited[neighbor_idx]:
+                    visited[neighbor_idx] = True
+                    queue.append(neighbor_idx)
+        
+        if len(current_cluster) > 1:  # Or remove this to keep singletons
             clusters[cluster_id] = current_cluster
             cluster_id += 1
-
+    
     return clusters
 
 

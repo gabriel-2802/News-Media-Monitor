@@ -67,6 +67,7 @@ public class RssFetcher {
             article.setUrl(syndEntry.getLink());
             article.setPublished(syndEntry.getPublishedDate() == null ? Date.from(Instant.now()) : syndEntry.getPublishedDate());
             article.setSummary(syndEntry.getDescription() != null ? syndEntry.getDescription().getValue() : " ");
+            article.setC
             return article;
         }
     }
