@@ -8,8 +8,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 
 /**
- * service implementation that triggers article clustering via an external AI service.
- * sends an HTTP POST request to the configured clustering endpoint.
+ * Service implementation that triggers article clustering via an external AI service.
+ * Sends an HTTP POST request to the configured clustering endpoint.
  */
 @Service
 @Slf4j

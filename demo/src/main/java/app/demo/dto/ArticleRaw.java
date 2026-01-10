@@ -1,14 +1,11 @@
 package app.demo.dto;
 
-import lombok.Data;
-
 import java.time.LocalDateTime;
 
-@Data
-public class ArticleRaw {
-    private String title;
-    private String content;
-    private String sourceName;
-    private String sourceUrl;
-    private LocalDateTime publishedDate;
-}
+public record ArticleRaw(
+        String title,
+        String content,
+        String sourceName,
+        String sourceUrl,
+        LocalDateTime publishedDate
+) {}

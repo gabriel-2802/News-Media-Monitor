@@ -14,10 +14,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * component responsible for assigning topics to articles using a classification engine.
- * <p>
- * it listens for topic repository change events to keep its internal topic map in sync.
- * topics are predicted using the {@link ClassificationEngine} and resolved via the {@link TopicRepository}.
+ * Component responsible for assigning topics to articles using a classification engine.
  */
 @Component
 @Slf4j

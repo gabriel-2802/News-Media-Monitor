@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * rest controller for administrative operations.
+ * Rest controller for administrative operations.
  *
  * <p>
- * provides endpoints for managing users, news sources, and monitoring processes.
- * accessible only to users with admin privileges.
+ * Provides endpoints for managing users, news sources, and monitoring processes.
+ * Accessible only to users with admin privileges.
  * </p>
  */
 @RestController
@@ -101,6 +101,4 @@ public class AdminController {
             return ResponseEntity.status(500).body("An error occurred while deleting all articles: " + e.getMessage());
         }
     }
-
-
 }

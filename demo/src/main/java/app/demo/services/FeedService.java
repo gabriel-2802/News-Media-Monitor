@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -58,9 +57,9 @@ public class FeedService {
     }
 
     public List<ArticleDTO> searchArticles(SearchRequestDTO searchRequest) {
-        List<Article> articles = SearchByKeyword(searchRequest.getKeyword());
-        addTopicConstraint(searchRequest.getTopicName(), articles);
-        addSourceConstraint(searchRequest.getSourceName(), articles);
+        List<Article> articles = SearchByKeyword(searchRequest.keyword());
+        addTopicConstraint(searchRequest.topicName(), articles);
+        addSourceConstraint(searchRequest.sourceName(), articles);
 
         return articles.stream()
                 .sorted(Comparator.comparing(Article::getPublished))

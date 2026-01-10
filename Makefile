@@ -1,22 +1,45 @@
-swarm_build_all:
+.PHONY: db build_all build_ai build_rss build_demo deploy check down
+
+# -----------------------------
+# Docker Swarm helpers (macOS)
+# -----------------------------
+
+db:
+	@id=$$(docker ps -q --filter "name=newsmonitor_db"); \
+	if [ -z "$$id" ]; then \
+		echo "DB container not running" 1>&2; \
+		exit 1; \
+	fi; \
+	docker exec -it $$id psql -U admin -d news_monitor_db
+
+build_all:
 	docker build -t ai_service:latest ./ai_models
 	docker build -t spring_app:latest ./demo
 	docker build -t rss_worker:latest ./rss
 
-swarm_build_ai:
+build_ai:
 	docker build -t ai_service:latest ./ai_models
 
-swarm_build_rss:
+build_rss:
 	docker build -t rss_worker:latest ./rss
 
-swarm_build_demo:
+build_demo:
 	docker build -t spring_app:latest ./demo
 
-swarm_deploy:
+deploy:
 	docker stack deploy -c stack.yml newsmonitor
 
-swarm_check:
+check_main:
+	docker service logs -f --timestamps newsmonitor_spring_app \
+	| sed 's/^/\x1b[32m[SPRING]\x1b[0m /'
+
+check_worker:
+	docker service logs -f --timestamps newsmonitor_rss_worker \
+	| sed 's/^/\x1b[36m[RSS]\x1b[0m /'
+
+
+check:
 	docker stack services newsmonitor
 
-swarm_down:
+down:
 	docker stack rm newsmonitor

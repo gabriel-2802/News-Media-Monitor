@@ -16,10 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.core.AuthenticationException;
 
 /**
- * rest controller that handles user authentication endpoints.
+ * Rest controller that handles user authentication endpoints.
  *
  * <p>
- * provides endpoints for user registration and login, interacting with {@link AuthService}.
+ * Provides endpoints for user registration and login, interacting with {@link AuthService}.
  * </p>
  */
 @RestController

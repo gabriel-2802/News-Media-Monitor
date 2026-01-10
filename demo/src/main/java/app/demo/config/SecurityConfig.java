@@ -17,13 +17,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import static app.demo.utils.Constants.*;
+
 /**
- * security configuration class for the application.
+ * Security configuration class for the application.
  *
  * <p>
- * sets up jwt-based stateless authentication using spring security.
- * it defines endpoint access rules, registers the jwt authentication filter,
- * configures the authentication manager, and provides a password encoder.
+ * Sets up jwt-based stateless authentication using spring security.
+ * It defines endpoint access rules, registers the jwt authentication filter,
+ * Configures the authentication manager, and provides a password encoder.
  * </p>
  */
 @Configuration
@@ -41,8 +43,8 @@ public class SecurityConfig {
                 .sessionManagement(sessionManagement ->
                         sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/user/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(ADMIN_ENDPOINT).hasRole(ADMIN)
+                        .requestMatchers(USER_ENDPOINT).hasAnyRole(USER, ADMIN)
                         .anyRequest().permitAll())
                 .exceptionHandling(exceptionHandling ->
                         exceptionHandling.authenticationEntryPoint(jwtAuthEntryPoint));

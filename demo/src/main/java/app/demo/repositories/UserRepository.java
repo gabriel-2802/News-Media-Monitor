@@ -25,4 +25,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.subscribedTopics WHERE :topic MEMBER OF u.subscribedTopics")
     List<User> findAllSubcribedToTopic(Topic topic);
 
+
 }

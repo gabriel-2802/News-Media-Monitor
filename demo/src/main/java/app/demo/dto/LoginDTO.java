@@ -1,9 +1,6 @@
 package app.demo.dto;
 
-import lombok.Data;
-
-@Data
-public class LoginDTO {
-    private String username;
-    private String password;
-}
+public record LoginDTO(
+        String username,
+        String password
+) {}

@@ -1,12 +1,8 @@
 package app.demo.dto;
 
-import lombok.Data;
-
-@Data
-public class NewsSourceDTO {
-    private Long id;
-    private String name;
-    private String baseUrl;
-    private String rssUrl;
-
-}
+public record NewsSourceDTO(
+        Long id,
+        String name,
+        String baseUrl,
+        String rssUrl
+) {}

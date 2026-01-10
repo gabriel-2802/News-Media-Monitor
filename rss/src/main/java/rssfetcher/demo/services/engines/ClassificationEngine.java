@@ -5,11 +5,11 @@ import rssfetcher.demo.entities.Article;
 import java.util.List;
 
 /**
- * interface for engines that classify articles into topics.
+ * Interface for engines that classify articles into topics.
  */
 public interface ClassificationEngine {
     /**
-     * classifies the given article into one of the provided topics.
+     * Classifies the given article into one of the provided topics.
      *
      * @param article the article to classify
      * @param topics the set of possible topic names

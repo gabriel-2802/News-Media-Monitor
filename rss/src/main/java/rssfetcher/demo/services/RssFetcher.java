@@ -20,14 +20,12 @@ import java.util.List;
 
 
 /**
- * component responsible for fetching and parsing RSS feeds from external news sources.
- * <p>
- * it uses the morss.it service to enrich feed content and converts entries into {@link Article} entities.
+ * Component responsible for fetching and parsing RSS feeds from external news sources.
  */
 @Component
 @Slf4j
 public class RssFetcher {
-    private static final String MORSS_FEED_URL = "https://morss.it/"; // used to extract content from RSS feeds
+    private static final String MORSS_FEED_URL = "https://morss.it/"; // used to extract more content from RSS feeds
 
     public List<Article> fetchFrom(NewsSource newsSource) {
         List<Article> articles = new ArrayList<>();
@@ -58,8 +56,7 @@ public class RssFetcher {
     }
 
     /*
-     * inner class to encapsulate the mapping logic.
-     * converts a SyndEntry object from the RSS feed into an Article entity.
+     * Inner class to encapsulate the mapping logic, converts a SyndEntry object from the RSS feed into an Article entity.
     */
     private static class RssMapper {
         public static Article toEntity(SyndEntry syndEntry, NewsSource newsSource) {

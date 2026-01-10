@@ -38,19 +38,19 @@ public class AuthService {
     @Transactional
     public void register(RegisterDTO registerDTO) throws ExistingUsernameException, ExistingEmailException, ResourceNotFoundException {
 
-        if (userRepository.findByUsername(registerDTO.getUsername()).isPresent()) {
-            throw new ExistingUsernameException("Username '" + registerDTO.getUsername() + "' already exists");
+        if (userRepository.findByUsername(registerDTO.username()).isPresent()) {
+            throw new ExistingUsernameException("Username '" + registerDTO.username() + "' already exists");
         }
 
-        if (userRepository.findByEmail(registerDTO.getEmail()).isPresent()) {
-            throw new ExistingEmailException("Email '" + registerDTO.getEmail() + "' already exists");
+        if (userRepository.findByEmail(registerDTO.email()).isPresent()) {
+            throw new ExistingEmailException("Email '" + registerDTO.email() + "' already exists");
         }
 
         User user = userMapper.toEntity(registerDTO);
         user.setPassword(passwordEncoder.encode(user.getPassword()));
 
-        RoleName roleName = (registerDTO.getAdminRegisterCode() != null &&
-                registerDTO.getAdminRegisterCode().equals(Constants.ADMIN_REGISTER_CODE))
+        RoleName roleName = (registerDTO.adminRegisterCode() != null &&
+                registerDTO.adminRegisterCode().equals(Constants.ADMIN_REGISTER_CODE))
                 ? RoleName.ROLE_ADMIN
                 : RoleName.ROLE_USER;
 
@@ -66,8 +66,8 @@ public class AuthService {
     public AuthDTO login(LoginDTO loginDTO) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        loginDTO.getUsername(),
-                        loginDTO.getPassword()
+                        loginDTO.username(),
+                        loginDTO.password()
                 )
         );
 

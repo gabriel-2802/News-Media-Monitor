@@ -1,14 +1,9 @@
 package app.demo.dto;
 
-import lombok.Data;
-import app.demo.dto.ArticleDTO;
-
-import java.util.HashSet;
 import java.util.Set;
 
-@Data
-public class ClusterDTO {
-    private Long id;
-    private ArticleDTO originalSource;
-    private Set<ArticleDTO> articles = new HashSet<>();
-}
+public record ClusterDTO(
+        Long id,
+        ArticleDTO originalSource,
+        Set<ArticleDTO> articles
+) {}

@@ -39,7 +39,7 @@ public class AdminService {
     }
 
     public UserDTO getUser(String username) {
-        Optional<User> user = userRepository.findByUsername(username);
+        Optional<User> user = userRepository.findByUsernameWithTopics(username);
         if (user.isPresent()) {
             return userMapper.toDTO(user.get());
         } else {
@@ -59,7 +59,7 @@ public class AdminService {
 
     @Transactional
     public NewsSourceDTO createNewsSource(NewsSourceDTO newsSourceDTO) throws ExistingRssSource {
-        if (newsSourceRepository.existsByRssUrl(newsSourceDTO.getRssUrl())) {
+        if (newsSourceRepository.existsByRssUrl(newsSourceDTO.rssUrl())) {
             throw new ExistingRssSource();
         }
 

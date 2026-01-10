@@ -14,10 +14,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * rest controller that exposes public endpoints for reading topics, articles, and news sources.
+ * Rest controller that exposes public endpoints for reading topics, articles, and news sources.
  *
  * <p>
- * provides access to feed data and supports topic-based filtering and custom article search.
+ * Provides access to feed data and supports topic-based filtering and custom article search.
  * </p>
  */
 @RestController

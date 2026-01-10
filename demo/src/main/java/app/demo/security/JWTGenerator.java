@@ -18,7 +18,7 @@ public class JWTGenerator {
         Date now = new Date(System.currentTimeMillis());
         Date expire = new Date(now.getTime() + Constants.JWT_EXPIRATION);
 
-        // Extract roles from the authentication object
+        // extract roles from the authentication object
         String roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.joining(","));

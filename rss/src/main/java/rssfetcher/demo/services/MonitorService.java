@@ -16,32 +16,21 @@ import java.util.List;
 public class MonitorService {
     protected final ArticleRepository articleRepository;
     protected final NewsSourceRepository newsSourceRepository;
-    protected final List<NewsSource> newsSources;
     protected final RssFetcher rssFetcher;
     protected final TopicAssigner topicAssigner;
 
     public MonitorService(ArticleRepository articleRepository, NewsSourceRepository newsSourceRepository, RssFetcher rssFetcher, TopicAssigner topicAssigner) {
         this.articleRepository = articleRepository;
         this.newsSourceRepository = newsSourceRepository;
-        this.newsSources = newsSourceRepository.findAll();
         this.rssFetcher = rssFetcher;
         this.topicAssigner = topicAssigner;
     }
 
     public void startMonitoring() {
-        var articles = monitor(newsSources);
+        var articles = monitor(newsSourceRepository.findAll());
         try {
             articleRepository.saveAll(articles);
         } catch (DataIntegrityViolationException ignored) {}
-    }
-
-    /**
-     * This method ensures there are no unnecessary calls to the database
-     */
-    @EventListener
-    public void handleNewsSourceRepoChangeEvent(NewsSourceRepoChangeEvent event) {
-        newsSources.clear();
-        newsSources.addAll(newsSourceRepository.findAll());
     }
 
     private List<Article> monitor(List<NewsSource> newsSources) {

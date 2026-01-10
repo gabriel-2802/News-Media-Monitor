@@ -1,14 +1,10 @@
 package rssfetcher.demo.services;
 
 /**
- * service interface for clustering articles stored in the database.
- * implementations should connect to the database, perform embedding, and group articles into clusters.
+ * Service interface for clustering articles stored in the database.
+ * Implementations should connect to the database, perform embedding, and group articles into clusters.
  */
 public interface ClusterService {
-
-    /**
-     * triggers the clustering process for unclustered articles.
-     */
     void cluster();
 }
 

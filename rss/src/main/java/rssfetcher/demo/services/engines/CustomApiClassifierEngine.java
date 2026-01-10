@@ -15,9 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * classifier engine that delegates topic prediction to an external HTTP API.
- * <p>
- * it sends article data to the API and parses the JSON response to extract the predicted topic.
+ * Classifier engine that delegates topic prediction to an external HTTP API
  */
 @Component
 @Slf4j

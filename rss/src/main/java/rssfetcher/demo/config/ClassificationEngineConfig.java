@@ -8,7 +8,7 @@ import rssfetcher.demo.services.engines.CustomApiClassifierEngine;
 import rssfetcher.demo.services.engines.HuggingFaceClassifierEngine;
 
 /**
- * configuration class that provides a {@link ClassificationEngine} bean
+ * Configuration class that provides a {@link ClassificationEngine} bean
  * based on the application property {@code monitoring.classification-engine}.
  *
  * <p>
@@ -20,10 +20,16 @@ import rssfetcher.demo.services.engines.HuggingFaceClassifierEngine;
 public class ClassificationEngineConfig {
     @Bean
     ClassificationEngine classifierEngine(@Value("${monitoring.classification-engine}") String engineType) {
-        return switch (engineType) {
-            case "custom" -> new CustomApiClassifierEngine();
-            case "hf" -> new HuggingFaceClassifierEngine();
-            default -> throw new IllegalArgumentException("Unknown classification engine type: " + engineType);
-        };
+        return new ClassificationEngineFactory().getEngine(engineType);
+    }
+
+    static class ClassificationEngineFactory {
+        public ClassificationEngine getEngine(String engineType) {
+            return switch (engineType) {
+                case "custom" -> new CustomApiClassifierEngine();
+                case "hf" -> new HuggingFaceClassifierEngine();
+                default -> throw new IllegalArgumentException("Unknown classification engine type: " + engineType);
+            };
+        }
     }
 }
