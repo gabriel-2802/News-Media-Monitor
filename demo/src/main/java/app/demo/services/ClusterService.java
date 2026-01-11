@@ -20,13 +20,10 @@ public class ClusterService {
 
     public ClusterService(@Value("${clustering.api.url:http://localhost:8000/cluster}") String clusteringUrl) {
         this.clusteringUrl = clusteringUrl;
-        log.info("ClusterServiceImpl1 initialized with clustering URL: {}", clusteringUrl);
     }
 
     public void cluster() {
         try {
-            log.info("Sending clustering request to: {}", clusteringUrl);
-
             HttpHeaders headers = new HttpHeaders();
             HttpEntity<Void> request = new HttpEntity<>(headers);
 

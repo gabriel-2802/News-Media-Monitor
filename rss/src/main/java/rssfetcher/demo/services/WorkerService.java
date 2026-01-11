@@ -1,18 +1,23 @@
 package rssfetcher.demo.services;
 
 import lombok.extern.slf4j.Slf4j;
+import org.postgresql.PGConnection;
+import org.postgresql.PGNotification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import rssfetcher.demo.entities.MonitoringJob;
 import rssfetcher.demo.repositories.MonitoringJobRepository;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import javax.sql.DataSource;
 import java.net.InetAddress;
-import java.time.Duration;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.*;
 
 @Slf4j
 @Service
@@ -21,41 +26,36 @@ public class WorkerService {
     private final MonitoringJobRepository jobRepository;
     private final MonitorService monitorService;
     private final TransactionTemplate tx;
-    private final ExecutorService timeoutExecutor;
+    private final DataSource dataSource;
 
     private final String workerId = getWorkerId() + "-" + UUID.randomUUID();
 
-    // backoff tuning
-    private static final long MIN_BACKOFF_MS = 25;
-    private static final long MAX_BACKOFF_MS = 2000;
-    private static final double BACKOFF_JITTER = 0.1;
-
-    // retry policy
+    // Retry policy
     private static final int MAX_ATTEMPTS = 5;
 
-    // processing timeout
-    private static final Duration PROCESSING_TIMEOUT = Duration.ofMinutes(5);
+    // Idle timeout before going into LISTEN mode
+    private static final long IDLE_CHECK_MS = 1000;
+    private static final int MAX_IDLE_CHECKS = 3;
 
-    // shutdown management
+    // Shutdown management
     private volatile boolean running = false;
     private Thread workerThread;
+    private Connection listenConnection;
 
     public WorkerService(MonitoringJobRepository jobRepository,
                          MonitorService monitorService,
-                         PlatformTransactionManager transactionManager) {
+                         PlatformTransactionManager transactionManager,
+                         DataSource dataSource) {
         this.jobRepository = jobRepository;
         this.monitorService = monitorService;
         this.tx = new TransactionTemplate(transactionManager);
-        this.timeoutExecutor = Executors.newCachedThreadPool(r -> {
-            Thread t = new Thread(r, "rss-worker-timeout");
-            t.setDaemon(true);
-            return t;
-        });
+        this.dataSource = dataSource;
     }
 
     /**
-     * Starts the worker loop. Should be called once from @PostConstruct or manually.
+     * Start worker in separate thread so Spring can finish starting up
      */
+    @PostConstruct
     public synchronized void start() {
         if (running) {
             log.warn("Worker already running");
@@ -69,28 +69,22 @@ public class WorkerService {
     }
 
     /**
-     * Main worker loop with graceful shutdown support
+     * Main worker loop: active processing -> LISTEN mode -> wake on notification
      */
     private void run() {
-        long backoff = MIN_BACKOFF_MS;
         int consecutiveFailures = 0;
 
         while (running && !Thread.currentThread().isInterrupted()) {
             try {
-                // single query returns the full job with updated attempts
-                Optional<MonitoringJob> jobOpt = claimNextJob();
-
-                if (jobOpt.isEmpty()) {
-                    sleep(backoff);
-                    backoff = calculateBackoff(backoff);
-                    continue;
-                }
-
-                // reset backoff when work is found
-                backoff = MIN_BACKOFF_MS;
+                // Phase 1: Process all available jobs
+                boolean foundWork = processAvailableJobs();
                 consecutiveFailures = 0;
 
-                processJob(jobOpt.get());
+                // Phase 2: If no work, enter LISTEN mode
+                if (!foundWork) {
+                    log.info("No pending jobs, entering LISTEN mode");
+                    waitForNotification();
+                }
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -100,13 +94,12 @@ public class WorkerService {
                 consecutiveFailures++;
                 log.error("Unexpected error in worker loop (failure {})", consecutiveFailures, e);
 
-                // emergency backoff if repeatedly failing
                 if (consecutiveFailures > 3) {
                     try {
                         sleep(5000);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        log.info("Worker interrupted during emergency backoff, shutting down");
+                        log.info("Worker interrupted during error backoff, shutting down");
                         break;
                     }
                 }
@@ -117,35 +110,95 @@ public class WorkerService {
     }
 
     /**
-     * Process a single job with timeout and proper error handling
+     * Process all available jobs until queue is empty.
+     * Returns true if any work was found.
      */
-    private void processJob(MonitoringJob job) throws InterruptedException {
+    private boolean processAvailableJobs() throws InterruptedException {
+        boolean foundAnyWork = false;
+        int idleChecks = 0;
+
+        while (running && !Thread.currentThread().isInterrupted()) {
+            Optional<MonitoringJob> jobOpt = claimNextJob();
+
+            if (jobOpt.isEmpty()) {
+                idleChecks++;
+                if (idleChecks >= MAX_IDLE_CHECKS) {
+                    break; // Queue is empty
+                }
+                sleep(IDLE_CHECK_MS);
+                continue;
+            }
+
+            foundAnyWork = true;
+            idleChecks = 0;
+            processJob(jobOpt.get());
+        }
+
+        return foundAnyWork;
+    }
+
+    /**
+     * Wait for PostgreSQL notification that new jobs are available
+     */
+    private void waitForNotification() throws InterruptedException {
+        try {
+            // Establish LISTEN connection if needed
+            if (listenConnection == null || listenConnection.isClosed()) {
+                setupListenConnection();
+            }
+
+            PGConnection pgConn = listenConnection.unwrap(PGConnection.class);
+
+            log.debug("Waiting for job notifications...");
+
+            // Block until notification arrives (with periodic checks for shutdown)
+            while (running && !Thread.currentThread().isInterrupted()) {
+                PGNotification[] notifications = pgConn.getNotifications(5000); // 5s timeout
+
+                if (notifications != null && notifications.length > 0) {
+                    log.info("Received {} job notification(s), resuming work", notifications.length);
+                    break;
+                }
+            }
+
+        } catch (SQLException e) {
+            log.error("Error in LISTEN mode, will retry", e);
+            closeListenConnection();
+            sleep(5000);
+        }
+    }
+
+    /**
+     * Set up PostgreSQL LISTEN connection
+     */
+    private void setupListenConnection() throws SQLException {
+        listenConnection = dataSource.getConnection();
+        listenConnection.setAutoCommit(true);
+
+        try (Statement stmt = listenConnection.createStatement()) {
+            stmt.execute("LISTEN new_monitoring_jobs");
+            log.info("Listening for job notifications on channel 'new_monitoring_jobs'");
+        }
+    }
+
+    /**
+     * Process a single job with error handling
+     */
+    private void processJob(MonitoringJob job) {
         Long jobId = job.getId();
 
         log.info("Processing job {} (attempt {}/{}): {}",
                 jobId, job.getAttempts(), MAX_ATTEMPTS, job.getRssUrl());
 
         try {
-            // Execute work with timeout protection
-            CompletableFuture<Void> future = CompletableFuture.runAsync(
-                    () -> monitorService.processRssUrl(job.getRssUrl()),
-                    timeoutExecutor
-            );
+            // Do the work - if this hangs, the worker hangs
+            monitorService.processRssUrl(job.getRssUrl());
 
-            future.get(PROCESSING_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-
-            // Mark as done in a short transaction
+            // Mark as done
             tx.executeWithoutResult(s -> {
                 jobRepository.markDone(jobId);
                 log.info("Job {} completed successfully", jobId);
             });
-
-        } catch (TimeoutException e) {
-            handleJobFailure(job, "Processing timeout after " + PROCESSING_TIMEOUT);
-
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause() != null ? e.getCause() : e;
-            handleJobFailure(job, cause.toString());
 
         } catch (Exception e) {
             handleJobFailure(job, e.toString());
@@ -176,8 +229,7 @@ public class WorkerService {
     }
 
     /**
-     * Claim next available job in a short transaction.
-     * Returns the full job entity with accurate attempts counter.
+     * Claim next available job in a short transaction
      */
     private Optional<MonitoringJob> claimNextJob() {
         try {
@@ -189,15 +241,6 @@ public class WorkerService {
     }
 
     /**
-     * Calculate backoff with exponential increase and jitter
-     */
-    private long calculateBackoff(long currentBackoff) {
-        long doubled = Math.min(MAX_BACKOFF_MS, currentBackoff * 2);
-        long jitter = (long) (Math.random() * doubled * BACKOFF_JITTER);
-        return doubled + jitter;
-    }
-
-    /**
      * Sleep with proper interrupt handling
      */
     private void sleep(long ms) throws InterruptedException {
@@ -205,7 +248,7 @@ public class WorkerService {
     }
 
     /**
-     * Graceful shutdown with timeout
+     * Graceful shutdown
      */
     @PreDestroy
     public synchronized void shutdown() {
@@ -219,7 +262,7 @@ public class WorkerService {
         if (workerThread != null) {
             workerThread.interrupt();
             try {
-                workerThread.join(10000); // Wait up to 10s
+                workerThread.join(10000);
                 if (workerThread.isAlive()) {
                     log.warn("Worker did not stop gracefully");
                 }
@@ -228,17 +271,20 @@ public class WorkerService {
             }
         }
 
-        timeoutExecutor.shutdown();
-        try {
-            if (!timeoutExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
-                timeoutExecutor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            timeoutExecutor.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
+        closeListenConnection();
 
         log.info("Worker shutdown complete: {}", workerId);
+    }
+
+    private void closeListenConnection() {
+        if (listenConnection != null) {
+            try {
+                listenConnection.close();
+            } catch (SQLException e) {
+                log.warn("Error closing LISTEN connection", e);
+            }
+            listenConnection = null;
+        }
     }
 
     private static String truncate(String s, int max) {

@@ -7,6 +7,7 @@ import lombok.Data;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Service
@@ -20,20 +21,28 @@ public class MonitoringService {
     @Transactional
     public int createMonitoringJobs() {
         List<NewsSource> sources = newsSourceRepository.findAll();
-        int inserted = 0;
 
-        for (var src : sources) {
-            String rssUrl = src.getRssUrl();
-            if (rssUrl == null || rssUrl.isBlank()) continue;
+        // batch insert
+        String sql = """
+        INSERT INTO monitoring_jobs (rss_url, status)
+        VALUES (?, 'pending')
+        ON CONFLICT DO NOTHING
+        """;
 
-            int n = jdbc.update("""
-                INSERT INTO monitoring_jobs (rss_url, status)
-                VALUES (?, 'pending')
-                ON CONFLICT DO NOTHING
-                """, rssUrl);
+        int[] results = jdbc.batchUpdate(sql,
+                sources.stream()
+                        .map(NewsSource::getRssUrl)
+                        .filter(url -> url != null && !url.isBlank())
+                        .map(url -> new Object[]{url})
+                        .toList()
+        );
 
-            inserted += n;
+        int inserted = Arrays.stream(results).sum();
+
+        if (inserted > 0) {
+            jdbc.execute("NOTIFY new_monitoring_jobs");
         }
+
         return inserted;
     }
 

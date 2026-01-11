@@ -30,7 +30,7 @@ DB_CONFIG = {
 # indexing parameters
 BATCH_SIZE = 100
 K_NEIGHBOURS = 20
-THRESHOLD = 0.85
+THRESHOLD = 0.6
 
 
 def fetch_articles_batch(batch_size: int) -> Generator[List[ArticleRow], None, None]:
