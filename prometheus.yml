@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: "spring_app"
+    metrics_path: "/actuator/prometheus"
+    dns_sd_configs:
+      - names:
+          - "tasks.newsmonitor_spring_app"
+        type: "A"
+        port: 8080
+  - job_name: "rss_worker"
+    metrics_path: "/actuator/prometheus"
+    dns_sd_configs:
+      - names:
+          - "tasks.newsmonitor_rss_worker"
+        type: "A"
+        port: 8081
+  - job_name: "ai_service"
+    metrics_path: "/metrics"
+    dns_sd_configs:
+      - names: ["tasks.newsmonitor_ai_service"]
+        type: "A"
+        port: 8000
+

@@ -1,4 +1,6 @@
-.PHONY: db build_all build_ai build_rss build_demo deploy check down
+.PHONY: db build_all build_ai build_rss build_main deploy check down \
+        check_main check_rss check_ai check_prom check_grafana \
+        open_prom open_grafana prom_targets
 
 db:
 	@id=$$(docker ps -q --filter "name=newsmonitor_db"); \
@@ -37,9 +39,30 @@ check_ai:
 	docker service logs -f --timestamps newsmonitor_ai_service \
 	| sed 's/^/\x1b[35m[AI]\x1b[0m /'
 
+# Prometheus logs
+check_prom:
+	docker service logs -f --timestamps newsmonitor_prometheus \
+	| sed 's/^/\x1b[33m[PROM]\x1b[0m /'
+
+# Grafana logs
+check_grafana:
+	docker service logs -f --timestamps newsmonitor_grafana \
+	| sed 's/^/\x1b[34m[GRAFANA]\x1b[0m /'
 
 check:
 	docker stack services newsmonitor
+
+# Open Prometheus UI (macOS)
+open_prom:
+	@open http://localhost:9090/targets
+
+# Open Grafana UI (macOS)
+open_grafana:
+	@open http://localhost:3000
+
+# Quick Prometheus targets check (prints the HTML; useful for grepping "UP")
+prom_targets:
+	@curl -fsS http://localhost:9090/targets || (echo "Prometheus not reachable on http://localhost:9090" 1>&2; exit 1)
 
 down:
 	docker stack rm newsmonitor

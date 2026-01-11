@@ -1,6 +1,44 @@
 version: "3.8"
 
+configs:
+  prometheus_config:
+    file: ./prometheus.yml
+
 services:
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+    volumes:
+      - prometheus-data:/prometheus
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
 
   db:
     image: postgres:16
@@ -17,8 +55,8 @@ services:
       restart_policy:
         condition: on-failure
 
-  ai_service: 
-    image: ai_service:latest           # <-- IMPORTANT
+  ai_service:
+    image: ai_service:latest
     ports:
       - "8002:8000"
     environment:
@@ -35,7 +73,7 @@ services:
         condition: on-failure
 
   rss_worker:
-    image: rss_worker:latest           # <-- IMPORTANT
+    image: rss_worker:latest
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/news_monitor_db
       SPRING_DATASOURCE_USERNAME: admin
@@ -51,7 +89,7 @@ services:
         condition: on-failure
 
   spring_app:
-    image: spring_app:latest           # <-- IMPORTANT
+    image: spring_app:latest
     ports:
       - "8080:8080"
     environment:
@@ -69,6 +107,8 @@ services:
 
 volumes:
   postgres-data:
+  prometheus-data:
+  grafana-data:
 
 networks:
   internal:
