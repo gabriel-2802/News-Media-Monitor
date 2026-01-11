@@ -1,9 +1,5 @@
 .PHONY: db build_all build_ai build_rss build_demo deploy check down
 
-# -----------------------------
-# Docker Swarm helpers (macOS)
-# -----------------------------
-
 db:
 	@id=$$(docker ps -q --filter "name=newsmonitor_db"); \
 	if [ -z "$$id" ]; then \
@@ -23,7 +19,7 @@ build_ai:
 build_rss:
 	docker build -t rss_worker:latest ./rss
 
-build_demo:
+build_main:
 	docker build -t spring_app:latest ./demo
 
 deploy:
@@ -33,7 +29,7 @@ check_main:
 	docker service logs -f --timestamps newsmonitor_spring_app \
 	| sed 's/^/\x1b[32m[SPRING]\x1b[0m /'
 
-check_worker:
+check_rss:
 	docker service logs -f --timestamps newsmonitor_rss_worker \
 	| sed 's/^/\x1b[36m[RSS]\x1b[0m /'
 
