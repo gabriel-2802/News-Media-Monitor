@@ -11,5 +11,6 @@ public record ArticleDTO(
         LocalDateTime published,
         String summary,
         String topic,
-        long clusterId
+        long clusterId,
+        boolean notified
 ) {}

@@ -24,6 +24,8 @@ public class Article {
      @Column(columnDefinition = "TEXT", unique = true)
      private String url;
 
+     private boolean notified = false;
+
      private Date published;
      @Column(columnDefinition = "TEXT")
      private String summary;

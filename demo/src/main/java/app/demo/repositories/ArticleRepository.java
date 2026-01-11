@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 
 public interface ArticleRepository extends JpaRepository<Article, Long> {
@@ -32,4 +33,7 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
           @@ plainto_tsquery('english', :searchRequest)
     """, nativeQuery = true)
     List<Article> searchByKeyword(@Param("searchRequest") String searchRequest);
+
+    @Query("SELECT a FROM Article a WHERE a.notified = false ORDER BY a.published DESC")
+    List<Article> findUnnotified();
 }

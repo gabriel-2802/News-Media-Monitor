@@ -29,6 +29,7 @@ public class AdminService {
     private final NewsSourceMapper newsSourceMapper;
     private final NewsSourceRepository newsSourceRepository;
     private final ArticleRepository articleRepository;
+    private final NotificationRepository notificationRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final ArticleClusterRepository articleClusterRepository;
 
@@ -84,6 +85,7 @@ public class AdminService {
         List<Article> articles = articleRepository.findAll().stream().peek(a -> a.setCluster(null)).toList();
         articleRepository.saveAll(articles);
 
+        notificationRepository.deleteAll();
         articleClusterRepository.deleteAll();
         articleRepository.deleteAll();
     }

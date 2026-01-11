@@ -2,6 +2,7 @@ package app.demo.controllers;
 
 import app.demo.dto.TopicDTO;
 import app.demo.dto.UserDTO;
+import app.demo.dto.UserProfileDTO;
 import app.demo.exceptions.AlreadySubscribed;
 import app.demo.exceptions.TopicNotFoundException;
 import app.demo.services.UserAccountService;
@@ -26,14 +27,14 @@ public class UserAccountController {
     private final UserAccountService userAccountService;
 
     @GetMapping("profile/{username}")
-    public ResponseEntity<UserDTO> getUserProfile(@PathVariable String username, Authentication authentication) {
+    public ResponseEntity<UserProfileDTO> getUserProfile(@PathVariable String username, Authentication authentication) {
 
         if (!Objects.equals(username, authentication.getName())) {
             log.warn("Unauthorized access attempt by user: {}", authentication.getName());
             return ResponseEntity.status(403).body(null);
         }
         try {
-            UserDTO userProfile = userAccountService.getUserProfile(username);
+            UserProfileDTO userProfile = userAccountService.getUserProfile(username);
             return ResponseEntity.ok(userProfile);
         } catch (UsernameNotFoundException e) {
             return ResponseEntity.notFound().build();

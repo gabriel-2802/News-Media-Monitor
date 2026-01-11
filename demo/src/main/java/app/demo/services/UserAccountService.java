@@ -2,33 +2,47 @@ package app.demo.services;
 
 import app.demo.dto.TopicDTO;
 import app.demo.dto.UserDTO;
+import app.demo.dto.UserProfileDTO;
+import app.demo.entities.Notification;
 import app.demo.entities.Topic;
 import app.demo.entities.User;
 import app.demo.exceptions.AlreadySubscribed;
 import app.demo.exceptions.TopicNotFoundException;
 import app.demo.mappers.TopicMapper;
 import app.demo.mappers.UserMapper;
+import app.demo.repositories.NotificationRepository;
 import app.demo.repositories.TopicRepository;
 import app.demo.repositories.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserAccountService {
     private final UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
     private final UserMapper userMapper;
     private final TopicRepository topicRepository;
     private final TopicMapper topicMapper;
 
-    public UserDTO getUserProfile(String username) {
-        return userRepository.findByUsernameWithTopics(username)
-                .map(userMapper::toDTO)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    public UserProfileDTO getUserProfile(String username) {
+        List<Notification> notifications;
+        Optional<User> userOpt = userRepository.findByUsernameWithTopics(username);
+
+        if (userOpt.isPresent()) {
+            notifications = notificationRepository.findByUsernameWithArticle(username);
+            return userMapper.toUserProfileDTO(userOpt.get(), notifications);
+        }
+
+        throw new UsernameNotFoundException("User not found");
     }
 
     @Transactional

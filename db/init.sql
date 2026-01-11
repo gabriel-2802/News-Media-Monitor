@@ -203,6 +203,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_rss_url_active
 ON monitoring_jobs (rss_url)
 WHERE status IN ('pending', 'processing');
 
-CREATE INDEX IF NOT EXISTS idx_jobs_pending_created_at
-ON monitoring_jobs (created_at, id)
-WHERE status = 'pending';
