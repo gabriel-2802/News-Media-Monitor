@@ -194,10 +194,10 @@ CREATE TABLE IF NOT EXISTS monitoring_jobs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_jobs_pending
-  ON monitoring_jobs (status, created_at);
+ON monitoring_jobs (status, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_jobs_rss_url
-  ON monitoring_jobs (rss_url);
+ON monitoring_jobs (rss_url);
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_rss_url_active
 ON monitoring_jobs (rss_url)

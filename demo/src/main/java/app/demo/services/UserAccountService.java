@@ -1,7 +1,6 @@
 package app.demo.services;
 
 import app.demo.dto.TopicDTO;
-import app.demo.dto.UserDTO;
 import app.demo.dto.UserProfileDTO;
 import app.demo.entities.Notification;
 import app.demo.entities.Topic;

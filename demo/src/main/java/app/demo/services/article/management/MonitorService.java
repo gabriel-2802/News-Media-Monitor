@@ -1,26 +1,47 @@
-package app.demo.services;
+package app.demo.services.article.management;
 
 import app.demo.entities.NewsSource;
+import app.demo.events.NewsSourceRepoChangeEvent;
 import app.demo.repositories.NewsSourceRepository;
 import jakarta.transaction.Transactional;
 import lombok.Data;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 @Service
 @Data
-public class MonitoringService {
+public class MonitorService {
     private final ClusterService clusterService;
     private final NewsSourceRepository newsSourceRepository;
     private final JdbcTemplate jdbc;
+    private List<NewsSource> src;
 
+    public MonitorService(ClusterService clusterService,
+                          NewsSourceRepository newsSourceRepository,
+                          JdbcTemplate jdbc) {
+        this.clusterService = clusterService;
+        this.newsSourceRepository = newsSourceRepository;
+        this.jdbc = jdbc;
+        src = newsSourceRepository.findAll();
+    }
+
+
+    @EventListener
+    public void handleNewsSourceRepoChange(NewsSourceRepoChangeEvent event) {
+        this.src = newsSourceRepository.findAll();
+    }
+
+
+    @Scheduled(cron = "${monitoring.create-jobs.schedule}")
     @SuppressWarnings("SqlResolve")
     @Transactional
     public int createMonitoringJobs() {
-        List<NewsSource> sources = newsSourceRepository.findAll();
 
         // batch insert
         String sql = """
@@ -30,7 +51,7 @@ public class MonitoringService {
         """;
 
         int[] results = jdbc.batchUpdate(sql,
-                sources.stream()
+                src.stream()
                         .map(NewsSource::getRssUrl)
                         .filter(url -> url != null && !url.isBlank())
                         .map(url -> new Object[]{url})
@@ -46,6 +67,8 @@ public class MonitoringService {
         return inserted;
     }
 
+
+    @Scheduled(cron = "${monitoring.requeue-stuck.schedule}")
     @SuppressWarnings("SqlResolve")
     @Transactional
     public int requeueStuckJobs(int minutesStuck, int maxAttempts) {
@@ -66,6 +89,7 @@ public class MonitoringService {
         """, minutesStuck, maxAttempts);
     }
 
+    @Scheduled(cron = "${monitoring.clustering.schedule}")
     public void triggerClustering() {
         clusterService.cluster();
     }

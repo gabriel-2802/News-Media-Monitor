@@ -1,4 +1,4 @@
-package app.demo.services;
+package app.demo.services.article.management;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

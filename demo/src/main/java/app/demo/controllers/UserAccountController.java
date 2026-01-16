@@ -1,7 +1,6 @@
 package app.demo.controllers;
 
 import app.demo.dto.TopicDTO;
-import app.demo.dto.UserDTO;
 import app.demo.dto.UserProfileDTO;
 import app.demo.exceptions.AlreadySubscribed;
 import app.demo.exceptions.TopicNotFoundException;

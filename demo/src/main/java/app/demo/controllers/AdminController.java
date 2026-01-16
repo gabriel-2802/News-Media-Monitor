@@ -5,7 +5,7 @@ import app.demo.dto.UserDTO;
 import app.demo.exceptions.ExistingRssSource;
 import app.demo.exceptions.SourceNotExisting;
 import app.demo.services.AdminService;
-import app.demo.services.MonitoringService;
+import app.demo.services.article.management.MonitorService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +29,7 @@ import java.util.List;
 @Slf4j
 public class AdminController {
     private final AdminService adminService;
-    private final MonitoringService monitoringService;
+    private final MonitorService monitoringService;
 
     @GetMapping("/users")
     ResponseEntity<List<UserDTO>> getAllUsers() {
