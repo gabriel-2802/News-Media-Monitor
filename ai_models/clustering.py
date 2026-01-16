@@ -13,7 +13,7 @@ ArticleRow = Tuple[int, str, str, str]  # (id, title, description, content)
 
 FETCH_QUERY = "SELECT article_id, title, summary, content FROM articles WHERE cluster_id IS NULL LIMIT %s OFFSET %s"
 
-FETCH_QUERY_TIME_LIMIT = "SELECT article_id, title, summary, content FROM articles WHERE (cluster_id IS NULL) AND  (published >= CURRENT_DATE LIMIT %s OFFSET %s)"
+FETCH_QUERY_TIME_LIMIT = "SELECT article_id, title, summary, content FROM articles WHERE (cluster_id IS NULL) AND (published >= CURRENT_DATE) LIMIT %s OFFSET %s"
 
 INSERT_CLUSTER_QUERY = "INSERT INTO article_clusters DEFAULT VALUES RETURNING cluster_id"
 
@@ -30,7 +30,7 @@ DB_CONFIG = {
 # indexing parameters
 BATCH_SIZE = 100
 K_NEIGHBOURS = 20
-THRESHOLD = 0.6
+THRESHOLD = 0.5
 
 
 def fetch_articles_batch(batch_size: int) -> Generator[List[ArticleRow], None, None]:
@@ -52,8 +52,6 @@ def fetch_articles_batch(batch_size: int) -> Generator[List[ArticleRow], None, N
                     break
                 yield rows
                 offset += batch_size
-    cursor.close()
-    conn.close()
 
 
 def embed_batch(articles: List[ArticleRow]) -> Tuple[List[int], np.ndarray]:

@@ -103,55 +103,6 @@ The model is accesible via 'FastAPI` endpoints.
 }
 ```
 
-
-## Monitoring Speedup and Efficiency
-
-###  Overview
-
-The application supports configurable parallelism for news monitoring and clustering through an asynchronous task execution strategy. This is controlled by the `monitoring.strategy` property, which can be set to either `async` (enabling multithreaded processing using a thread pool) or `single-threaded` (for sequential execution). When `async` is enabled, the task execution is handled by a configurable `ThreadPoolExecutor`, with the following properties:
-
-```properties
-monitoring.async.core-pool-size=6
-monitoring.async.max-pool-size=10
-monitoring.async.queue-capacity=100
-```
-
-
-### Raw Data
-
-| Threads | Time (s) | Speedup                  | Efficiency (%)              |
-| ------- | -------- | ------------------------ | --------------------------- |
-| 1       | 45.30    | baseline                 | baseline                    |
-| 4       | 30.00    | 45.30 / 30.00 ≈ **1.51** | 1.51 / 4 × 100 ≈ **37.75%** |
-| 6       | 22.00    | 45.30 / 22.00 ≈ **2.06** | 2.06 / 6 × 100 ≈ **34.33%** |
-| 8       | 27.18    | 45.30 / 27.18 ≈ **1.67** | 1.67 / 8 × 100 ≈ **20.88%** |
-
----
-
-### Summary Statistics
-
-#### Average Speedup:
-
-$$
-\text{Average Speedup} = \frac{1.51 + 2.06 + 1.67}{3} \approx \boxed{1.75}
-$$
-
-#### Average Efficiency:
-
-$$
-\text{Average Efficiency} = \frac{37.75 + 34.33 + 20.88}{3} \approx \boxed{30.99\%}
-$$
-
-
-### Analysis
-
-* **Best performance** is achieved with **6 threads**, which offers the highest speedup (≈ 2.06×) and reasonable efficiency (≈ 34.33%).
-* **8 threads** underperforms due to overhead and likely I/O or CPU contention, leading to decreased efficiency (≈ 20.88%).
-* The **average speedup of 1.75×** shows the system benefits significantly from parallelism.
-* **Average efficiency of \~31%** indicates that while parallelization is effective, it’s subject to diminishing returns due to factors such as thread management overhead and I/O blocking.
-
-
-
 ## Search Functionality
 
 
@@ -523,44 +474,6 @@ Deletes a news source by its ID.
   ```
 
 
-#### POST `/api/admin/monitor/start`
-
-Starts the article fetching process from all news sources.
-
-**Responses:**
-
-* **200 OK**
-
-  ```
-  Monitor started successfully
-  ```
-
-* **500 Internal Server Error**
-
-  ```
-  An error occurred while starting the monitor: {error message}
-  ```
-
-
-#### POST `/api/admin/monitor/cluster`
-
-Starts the clustering process for previously collected articles.
-
-**Responses:**
-
-* **200 OK**
-
-  ```
-  Cluster monitor started successfully
-  ```
-
-* **500 Internal Server Error**
-
-  ```
-  An error occurred while starting the cluster monitor: {error message}
-  ```
-
-
 #### DELETE `/api/admin/purge_all`
 
 Deletes all stored articles in the system.
@@ -789,7 +702,7 @@ Requires authentication via JWT for all endpoints.
 
 #### GET `/api/user/profile/{username}`
 
-Retrieves the authenticated user's profile.
+Retrieves the authenticated user's profile and notifications.
 
 **Path Parameter:**
 
@@ -867,7 +780,6 @@ Subscribes the authenticated user to a specific topic.
   ```
   null
   ```
-
 
 #### DELETE `/api/user/unsubscribe/{topicId}`
 

@@ -14,7 +14,6 @@ import java.net.InetAddress;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
@@ -26,9 +25,6 @@ public class WorkerService {
     private final ClusterService clusterService;
     private final TransactionTemplate tx;
     private final String workerId = generateWorkerId();
-
-    // Prevents concurrent fetch cycles on this worker
-    private final AtomicBoolean fetchInProgress = new AtomicBoolean(false);
 
     // retry policy for individual sources
     private static final int MAX_CONSECUTIVE_FAILURES = 5;
@@ -53,11 +49,6 @@ public class WorkerService {
      */
     @Scheduled(fixedDelayString = "${worker.fetch-interval-ms:10800000}")
     public void scheduledFetch() {
-        if (!fetchInProgress.compareAndSet(false, true)) {
-            log.info("Fetch cycle already in progress, skipping");
-            return;
-        }
-
         log.info("=== Starting scheduled fetch cycle, worker: {} ===", workerId);
         int processedCount = 0;
         int failedCount = 0;
@@ -85,7 +76,6 @@ public class WorkerService {
         } catch (Exception e) {
             log.error("Unexpected error in fetch cycle", e);
         } finally {
-            fetchInProgress.set(false);
             log.info("=== Fetch cycle completed: {} processed, {} failed ===", processedCount, failedCount);
         }
     }
@@ -179,7 +169,7 @@ public class WorkerService {
     }
 
     /**
-     * handle source processing failure with tracking
+     * Handle source processing failure with tracking
      */
     private void handleSourceFailure(NewsSource source, String errorMessage) {
         Long sourceId = source.getId();
