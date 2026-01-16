@@ -1,301 +1,232 @@
 package rssfetcher.demo.services;
 
 import lombok.extern.slf4j.Slf4j;
-import org.postgresql.PGConnection;
-import org.postgresql.PGNotification;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import rssfetcher.demo.entities.MonitoringJob;
-import rssfetcher.demo.repositories.MonitoringJobRepository;
+import rssfetcher.demo.entities.NewsSource;
+import rssfetcher.demo.repositories.FetchCycleStateRepository;
+import rssfetcher.demo.repositories.NewsSourceRepository;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
-import javax.sql.DataSource;
 import java.net.InetAddress;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
 public class WorkerService {
 
-    private final MonitoringJobRepository jobRepository;
+    private final NewsSourceRepository newsSourceRepository;
+    private final FetchCycleStateRepository fetchCycleStateRepository;
     private final MonitorService monitorService;
+    private final ClusterService clusterService;
     private final TransactionTemplate tx;
-    private final DataSource dataSource;
+    private final String workerId = generateWorkerId();
 
-    private final String workerId = getWorkerId() + "-" + UUID.randomUUID();
+    // Prevents concurrent fetch cycles on this worker
+    private final AtomicBoolean fetchInProgress = new AtomicBoolean(false);
 
-    // Retry policy
-    private static final int MAX_ATTEMPTS = 5;
+    // retry policy for individual sources
+    private static final int MAX_CONSECUTIVE_FAILURES = 5;
 
-    // Idle timeout before going into LISTEN mode
-    private static final long IDLE_CHECK_MS = 1000;
-    private static final int MAX_IDLE_CHECKS = 3;
-
-    // Shutdown management
-    private volatile boolean running = false;
-    private Thread workerThread;
-    private Connection listenConnection;
-
-    public WorkerService(MonitoringJobRepository jobRepository,
+    public WorkerService(NewsSourceRepository newsSourceRepository,
+                         FetchCycleStateRepository fetchCycleStateRepository,
                          MonitorService monitorService,
-                         PlatformTransactionManager transactionManager,
-                         DataSource dataSource) {
-        this.jobRepository = jobRepository;
+                         ClusterService clusterService,
+                         PlatformTransactionManager transactionManager) {
+        this.newsSourceRepository = newsSourceRepository;
+        this.fetchCycleStateRepository = fetchCycleStateRepository;
         this.monitorService = monitorService;
+        this.clusterService = clusterService;
         this.tx = new TransactionTemplate(transactionManager);
-        this.dataSource = dataSource;
     }
 
     /**
-     * Start worker in separate thread so Spring can finish starting up
+     * Scheduled job that runs on startup and then every X hours.
+     * Each worker will claim and process news sources one by one until no more are available.
+     * The FOR UPDATE SKIP LOCKED ensures no two workers process the same source.
+     * When the last source is processed, exactly one worker triggers clustering.
      */
-    @PostConstruct
-    public synchronized void start() {
-        if (running) {
-            log.warn("Worker already running");
+    @Scheduled(fixedDelayString = "${worker.fetch-interval-ms:10800000}")
+    public void scheduledFetch() {
+        if (!fetchInProgress.compareAndSet(false, true)) {
+            log.info("Fetch cycle already in progress, skipping");
             return;
         }
 
-        running = true;
-        workerThread = new Thread(this::run, "rss-worker-" + workerId);
-        workerThread.start();
-        log.info("Worker started: {}", workerId);
-    }
+        log.info("=== Starting scheduled fetch cycle, worker: {} ===", workerId);
+        int processedCount = 0;
+        int failedCount = 0;
 
-    /**
-     * Main worker loop: active processing -> LISTEN mode -> wake on notification
-     */
-    private void run() {
-        int consecutiveFailures = 0;
-
-        while (running && !Thread.currentThread().isInterrupted()) {
-            try {
-                // Phase 1: Process all available jobs
-                boolean foundWork = processAvailableJobs();
-                consecutiveFailures = 0;
-
-                // Phase 2: If no work, enter LISTEN mode
-                if (!foundWork) {
-                    log.info("No pending jobs, entering LISTEN mode");
-                    waitForNotification();
-                }
-
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.info("Worker interrupted, shutting down");
-                break;
-            } catch (Exception e) {
-                consecutiveFailures++;
-                log.error("Unexpected error in worker loop (failure {})", consecutiveFailures, e);
-
-                if (consecutiveFailures > 3) {
-                    try {
-                        sleep(5000);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        log.info("Worker interrupted during error backoff, shutting down");
-                        break;
-                    }
-                }
-            }
-        }
-
-        log.info("Worker stopped: {}", workerId);
-    }
-
-    /**
-     * Process all available jobs until queue is empty.
-     * Returns true if any work was found.
-     */
-    private boolean processAvailableJobs() throws InterruptedException {
-        boolean foundAnyWork = false;
-        int idleChecks = 0;
-
-        while (running && !Thread.currentThread().isInterrupted()) {
-            Optional<MonitoringJob> jobOpt = claimNextJob();
-
-            if (jobOpt.isEmpty()) {
-                idleChecks++;
-                if (idleChecks >= MAX_IDLE_CHECKS) {
-                    break; // Queue is empty
-                }
-                sleep(IDLE_CHECK_MS);
-                continue;
-            }
-
-            foundAnyWork = true;
-            idleChecks = 0;
-            processJob(jobOpt.get());
-        }
-
-        return foundAnyWork;
-    }
-
-    /**
-     * Wait for PostgreSQL notification that new jobs are available
-     */
-    private void waitForNotification() throws InterruptedException {
         try {
-            // Establish LISTEN connection if needed
-            if (listenConnection == null || listenConnection.isClosed()) {
-                setupListenConnection();
-            }
+            while (true) {
+                Optional<NewsSource> sourceOpt = claimNextSource();
 
-            PGConnection pgConn = listenConnection.unwrap(PGConnection.class);
-
-            log.debug("Waiting for job notifications...");
-
-            // Block until notification arrives (with periodic checks for shutdown)
-            while (running && !Thread.currentThread().isInterrupted()) {
-                PGNotification[] notifications = pgConn.getNotifications(5000); // 5s timeout
-
-                if (notifications != null && notifications.length > 0) {
-                    log.info("Received {} job notification(s), resuming work", notifications.length);
+                if (sourceOpt.isEmpty()) {
+                    log.info("No more sources to process in this cycle");
+                    // Try to trigger clustering (only one worker will succeed)
+                    tryTriggerClustering();
                     break;
                 }
+
+                NewsSource source = sourceOpt.get();
+                boolean success = processSource(source);
+
+                if (success) {
+                    processedCount++;
+                } else {
+                    failedCount++;
+                }
             }
-
-        } catch (SQLException e) {
-            log.error("Error in LISTEN mode, will retry", e);
-            closeListenConnection();
-            sleep(5000);
-        }
-    }
-
-    /**
-     * Set up PostgreSQL LISTEN connection
-     */
-    private void setupListenConnection() throws SQLException {
-        listenConnection = dataSource.getConnection();
-        listenConnection.setAutoCommit(true);
-
-        try (Statement stmt = listenConnection.createStatement()) {
-            stmt.execute("LISTEN new_monitoring_jobs");
-            log.info("Listening for job notifications on channel 'new_monitoring_jobs'");
-        }
-    }
-
-    /**
-     * Process a single job with error handling
-     */
-    private void processJob(MonitoringJob job) {
-        Long jobId = job.getId();
-
-        log.info("Processing job {} (attempt {}/{}): {}",
-                jobId, job.getAttempts(), MAX_ATTEMPTS, job.getRssUrl());
-
-        try {
-            // Do the work - if this hangs, the worker hangs
-            monitorService.processRssUrl(job.getRssUrl());
-
-            // Mark as done
-            tx.executeWithoutResult(s -> {
-                jobRepository.markDone(jobId);
-                log.info("Job {} completed successfully", jobId);
-            });
-
         } catch (Exception e) {
-            handleJobFailure(job, e.toString());
+            log.error("Unexpected error in fetch cycle", e);
+        } finally {
+            fetchInProgress.set(false);
+            log.info("=== Fetch cycle completed: {} processed, {} failed ===", processedCount, failedCount);
         }
     }
 
     /**
-     * Handle job failure with retry or final failure marking
+     * Attempts to claim the right to trigger clustering.
+     * Only one worker across all instances will succeed due to atomic update.
      */
-    private void handleJobFailure(MonitoringJob job, String errorMessage) {
-        Long jobId = job.getId();
-        int attempts = job.getAttempts();
-        String truncatedError = truncate(errorMessage, 2000);
-
-        if (attempts < MAX_ATTEMPTS) {
-            tx.executeWithoutResult(s -> {
-                jobRepository.requeue(jobId, truncatedError);
-                log.warn("Job {} failed (attempt {}/{}), requeued: {}",
-                        jobId, attempts, MAX_ATTEMPTS, truncatedError);
-            });
-        } else {
-            tx.executeWithoutResult(s -> {
-                jobRepository.markFailed(jobId, truncatedError);
-                log.error("Job {} permanently failed after {} attempts: {}",
-                        jobId, MAX_ATTEMPTS, truncatedError);
-            });
-        }
-    }
-
-    /**
-     * Claim next available job in a short transaction
-     */
-    private Optional<MonitoringJob> claimNextJob() {
+    private void tryTriggerClustering() {
         try {
-            return tx.execute(status -> jobRepository.claimNextJob(workerId));
+            Boolean claimed = tx.execute(status -> {
+                // Check if there are still unfetched sources (maybe another worker is processing)
+                long unfetched = newsSourceRepository.countUnfetchedSources();
+                if (unfetched > 0) {
+                    log.debug("Still {} unfetched sources, not triggering clustering yet", unfetched);
+                    return false;
+                }
+
+                // Try to atomically claim the clustering trigger
+                int updated = fetchCycleStateRepository.claimClusteringTrigger(workerId, Instant.now());
+                return updated > 0;
+            });
+
+            if (Boolean.TRUE.equals(claimed)) {
+                log.info("This worker claimed clustering trigger, starting clustering...");
+                clusterService.cluster();
+
+                // Reset all sources for the next cycle after clustering completes
+                tx.executeWithoutResult(status -> {
+                    int reset = newsSourceRepository.resetAllForNewCycle();
+                    fetchCycleStateRepository.startNewCycle(Instant.now());
+                    log.info("Reset {} sources for next fetch cycle", reset);
+                });
+            } else {
+                log.debug("Another worker will trigger clustering (or already did)");
+            }
         } catch (Exception e) {
-            log.error("Failed to claim job", e);
+            log.error("Error while trying to trigger clustering", e);
+        }
+    }
+
+    /**
+     * Claim and lock the next available news source for processing.
+     * Uses FOR UPDATE SKIP LOCKED to ensure no two workers claim the same source.
+     */
+    private Optional<NewsSource> claimNextSource() {
+        try {
+            return tx.execute(status -> {
+                Optional<NewsSource> sourceOpt = newsSourceRepository.findNextAvailable();
+                if (sourceOpt.isPresent()) {
+                    NewsSource source = sourceOpt.get();
+                    newsSourceRepository.lockSource(source.getId(), workerId, Instant.now());
+                    log.debug("Claimed source: {} ({})", source.getName(), source.getRssUrl());
+                }
+                return sourceOpt;
+            });
+        } catch (Exception e) {
+            log.error("Failed to claim source", e);
             return Optional.empty();
         }
     }
 
     /**
-     * Sleep with proper interrupt handling
+     * Process a single news source - fetch RSS and save articles.
+     * Returns true on success, false on failure.
      */
-    private void sleep(long ms) throws InterruptedException {
-        Thread.sleep(ms);
+    private boolean processSource(NewsSource source) {
+        Long sourceId = source.getId();
+        String sourceName = source.getName();
+        String rssUrl = source.getRssUrl();
+
+        log.info("Processing source: {} ({})", sourceName, rssUrl);
+
+        try {
+            // actual RSS fetching and article processing
+            monitorService.processRssUrl(rssUrl);
+
+            // Mark as successful
+            Instant now = Instant.now();
+            tx.executeWithoutResult(s -> {
+                newsSourceRepository.markSuccess(sourceId, now);
+                log.info("Source {} completed successfully", sourceName);
+            });
+
+            return true;
+
+        } catch (Exception e) {
+            handleSourceFailure(source, e.getMessage());
+            return false;
+        }
     }
 
     /**
-     * Graceful shutdown
+     * handle source processing failure with tracking
      */
-    @PreDestroy
-    public synchronized void shutdown() {
-        if (!running) {
-            return;
-        }
+    private void handleSourceFailure(NewsSource source, String errorMessage) {
+        Long sourceId = source.getId();
+        String sourceName = source.getName();
+        int failures = (source.getConsecutiveFailures() != null ? source.getConsecutiveFailures() : 0) + 1;
+        String truncatedError = truncate(errorMessage, 2000);
 
-        log.info("Shutting down worker: {}", workerId);
-        running = false;
+        tx.executeWithoutResult(s -> {
+            newsSourceRepository.markFailed(sourceId, truncatedError);
 
-        if (workerThread != null) {
-            workerThread.interrupt();
-            try {
-                workerThread.join(10000);
-                if (workerThread.isAlive()) {
-                    log.warn("Worker did not stop gracefully");
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            if (failures >= MAX_CONSECUTIVE_FAILURES) {
+                log.error("Source {} has {} consecutive failures: {}",
+                        sourceName, failures, truncatedError);
+            } else {
+                log.warn("Source {} failed (failure {}/{}): {}",
+                        sourceName, failures, MAX_CONSECUTIVE_FAILURES, truncatedError);
             }
-        }
-
-        closeListenConnection();
-
-        log.info("Worker shutdown complete: {}", workerId);
+        });
     }
 
-    private void closeListenConnection() {
-        if (listenConnection != null) {
-            try {
-                listenConnection.close();
-            } catch (SQLException e) {
-                log.warn("Error closing LISTEN connection", e);
-            }
-            listenConnection = null;
+    /**
+     * Release all locks held by this worker on graceful shutdown
+     */
+    @PreDestroy
+    public void releaseLocksOnShutdown() {
+        try {
+            tx.executeWithoutResult(s -> {
+                int released = newsSourceRepository.releaseAllLocks(workerId);
+                if (released > 0) {
+                    log.info("Released {} source lock(s) on shutdown", released);
+                }
+            });
+        } catch (Exception e) {
+            log.warn("Failed to release locks on shutdown", e);
         }
     }
 
     private static String truncate(String s, int max) {
+        if (s == null) return null;
         return s.length() <= max ? s : s.substring(0, max);
     }
 
-    private String getWorkerId() {
+    private static String generateWorkerId() {
         try {
-            return InetAddress.getLocalHost().getHostName();
+            return InetAddress.getLocalHost().getHostName() + "-" + UUID.randomUUID().toString().substring(0, 8);
         } catch (Exception e) {
-            return "unknown-host";
+            return "worker-" + UUID.randomUUID().toString().substring(0, 8);
         }
     }
 }

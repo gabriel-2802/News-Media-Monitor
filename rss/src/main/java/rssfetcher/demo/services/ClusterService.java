@@ -1,4 +1,4 @@
-package app.demo.services.article.management;
+package rssfetcher.demo.services;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +11,7 @@ import org.springframework.web.client.RestTemplate;
 /**
  * Service implementation that triggers article clustering via an external AI service.
  * Sends an HTTP POST request to the configured clustering endpoint.
+ * Called by WorkerService after all sources have been fetched.
  */
 @Service
 @Slf4j
@@ -22,7 +23,11 @@ public class ClusterService {
         this.clusteringUrl = clusteringUrl;
     }
 
+    /**
+     * Triggers clustering of articles. Should be called only once per fetch cycle.
+     */
     public void cluster() {
+        log.info("Triggering article clustering...");
         try {
             HttpHeaders headers = new HttpHeaders();
             HttpEntity<Void> request = new HttpEntity<>(headers);
@@ -43,7 +48,6 @@ public class ClusterService {
             log.error("Error during clustering: {} - {}", e.getClass().getName(), e.getMessage(), e);
         }
     }
-
 }
 
 

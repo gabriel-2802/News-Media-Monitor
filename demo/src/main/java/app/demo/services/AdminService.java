@@ -84,7 +84,6 @@ public class AdminService {
     public void purgeAll() {
         List<Article> articles = articleRepository.findAll().stream().peek(a -> a.setCluster(null)).toList();
         articleRepository.saveAll(articles);
-
         notificationRepository.deleteAll();
         articleClusterRepository.deleteAll();
         articleRepository.deleteAll();

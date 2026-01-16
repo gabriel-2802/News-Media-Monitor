@@ -203,3 +203,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_rss_url_active
 ON monitoring_jobs (rss_url)
 WHERE status IN ('pending', 'processing');
 
+-- Index for efficient claiming of next available source
+CREATE INDEX IF NOT EXISTS idx_news_sources_fetched_cycle
+ON news_sources (fetched_this_cycle, last_fetched_at NULLS FIRST, id)
+WHERE enabled = true;
+
+-- Index for lock expiry cleanup
+CREATE INDEX IF NOT EXISTS idx_news_sources_locked_at
+ON news_sources (locked_at)
+WHERE locked_by IS NOT NULL;
+
+-- Table to coordinate fetch cycles and clustering trigger across workers
+CREATE TABLE IF NOT EXISTS fetch_cycle_state (
+    id BIGINT PRIMARY KEY DEFAULT 1,
+    cycle_id BIGINT DEFAULT 0,
+    clustering_triggered BOOLEAN DEFAULT FALSE,
+    clustering_triggered_by VARCHAR(255),
+    clustering_triggered_at TIMESTAMP,
+    last_cycle_started_at TIMESTAMP,
+    CONSTRAINT single_row CHECK (id = 1)
+);
+
+-- Insert the single coordination row
+INSERT INTO fetch_cycle_state (id, cycle_id, clustering_triggered)
+VALUES (1, 0, false)
+ON CONFLICT (id) DO NOTHING;
