@@ -1,598 +1,273 @@
 # News Media Monitor
 
-This project is a news monitoring platform that fetches, classifies, and clusters news articles from various sources. It provides a RESTful API for user interaction and administrative tasks, leveraging custom AI models for text classification and clustering as well as worker containers for background processing.
+A distributed news monitoring platform that automatically fetches, classifies, and clusters news articles from RSS feeds. The system uses custom AI models for intelligent topic classification and article clustering, with a RESTful API for user interaction.
+
+## Components
+
+### Spring App (Backend API)
+
+**Location:** `demo/`
+
+The main backend service providing REST APIs for users and administrators.
+
+**Responsibilities:**
+- User authentication and authorization (JWT-based)
+- Article feed management and search
+- News source administration
+- User profile and notification management
+- Scheduled job creation for RSS monitoring
+
+**Key Features:**
+- Role-based access control (ROLE_USER, ROLE_ADMIN)
+- Full-text article search by keyword, topic, or source
+- Topic-based article filtering
+- Article clustering views
+
+**Configuration:**
+| Property | Description | Default |
+|----------|-------------|---------|
+| `SPRING_DATASOURCE_URL` | PostgreSQL connection URL | `jdbc:postgresql://db:5432/news_monitor_db` |
+| `AI_SERVICE_URL` | AI service base URL | `http://ai_service:8000` |
+
+**Port:** 8080
+
+---
+
+### RSS Worker
+
+**Location:** `rss/`
+
+Distributed worker service responsible for fetching articles from RSS feeds. Runs as multiple replicas (default: 3) for horizontal scaling. Built with Spring Boot.
+
+**Responsibilities:**
+- Periodic RSS feed fetching (configurable interval, default: 3 hours)
+- Article parsing and extraction
+- Topic classification via AI Service
+- Coordinated clustering trigger across workers
+- Duplicate detection (based on unique article URLs)
+
+**Worker Coordination:**
+- Uses `FOR UPDATE SKIP LOCKED` for distributed locking
+- Each worker claims news sources atomically to prevent duplicate processing
+- After all sources are processed, exactly one worker triggers clustering
+- Automatic retry with configurable max consecutive failures
+
+**Communication:**
+- **AI Service** → HTTP POST to `/classify` for topic prediction
+- **AI Service** → HTTP POST to `/cluster` to trigger article clustering
+- **Database** → JDBC for article storage and job coordination
+
+**Configuration:**
+| Property | Description | Default |
+|----------|-------------|---------|
+| `CLASSIFICATION_API_URL` | Classification endpoint | `http://ai_service:8000/classify` |
+| `CLUSTERING_API_URL` | Clustering endpoint | `http://ai_service:8000/cluster` |
+| `worker.fetch-interval-ms` | Interval between fetch cycles | `10800000` (3 hours) |
+| `WORKER_INDEX` | Worker instance identifier | Auto-assigned via Docker |
+| `WORKER_COUNT` | Total number of workers | `3` |
+
+**Port:** 8081 (metrics only, no HTTP API)
+
+---
+
+### AI Service
+
+**Location:** `ai_models/`
+
+Python-based microservice providing ML capabilities for article classification and clustering. Built with FastAPI.
+
+**Responsibilities:**
+- **Topic Classification:** Predicts article topics using a fine-tuned DistilBERT model (86% accuracy)
+- **Article Clustering:** Groups similar articles using embeddings and FAISS indexing
+
+**ML Models:**
+| Model | Purpose | Technology |
+|-------|---------|------------|
+| NewsClassifier | Topic prediction | DistilBERT (fine-tuned), ~40 topic categories |
+| TextEmbedder | Semantic similarity | sentence-transformers/all-MiniLM-L6-v2 |
+| Clustering | Article grouping | FAISS (IndexFlatIP with cosine similarity) |
+
+**API Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/classify` | POST | Classify article text into a topic |
+| `/cluster` | POST | Trigger clustering of unprocessed articles |
+| `/metrics` | GET | Prometheus metrics |
+
+**Classification Request:**
+```json
+{
+  "text": "Article title and summary...",
+  "default_topic": "politics"
+}
+```
+
+**Classification Response:**
+```json
+{
+  "topic": "politics"
+}
+```
+
+**Clustering Algorithm:**
+1. Fetch unclustered articles from database
+2. Generate embeddings using SentenceTransformer
+3. Build FAISS index with cosine similarity
+4. Apply graph-based clustering with configurable threshold
+5. Persist cluster assignments to database
+
+**Configuration:**
+| Property | Description | Default |
+|----------|-------------|---------|
+| `DB_HOST` | PostgreSQL host | `db` |
+| `DB_PORT` | PostgreSQL port | `5432` |
+| `DB_USER` | Database user | `admin` |
+| `DB_PASSWORD` | Database password | `admin` |
+
+**Port:** 8000 (exposed as 8002 externally)
+
+---
+
+### PostgreSQL Database
+
+**Location:** `db/`
+
+Central data store for all application data.
+
+**Key Tables:**
+| Table | Description |
+|-------|-------------|
+| `articles` | News articles with content, metadata, topic, and cluster assignments |
+| `article_clusters` | Groups of semantically similar articles |
+| `news_sources` | RSS feed URLs and fetch state |
+| `topics` | Predefined topic categories (~40 categories) |
+| `users` | User accounts |
+| `roles` | Role definitions (ROLE_USER, ROLE_ADMIN) |
+| `notifications` | User notifications |
+
+**Initialization:** The `db/init.sql` script seeds roles and predefined topics on first startup.
+
+**Port:** 5432
+
+---
+
+### Monitoring Stack
+
+**Prometheus** and **Grafana** provide observability for the platform.
+
+**Prometheus Configuration:**
+- Scrapes metrics from all services every 10 seconds
+- Uses DNS service discovery for Docker Swarm tasks
+
+**Scraped Endpoints:**
+| Service | Endpoint | Port |
+|---------|----------|------|
+| Spring App | `/actuator/prometheus` | 8080 |
+| RSS Worker | `/actuator/prometheus` | 8081 |
+| AI Service | `/metrics` | 8000 |
+
+**Key Metrics:**
+- `http_requests_total` - HTTP request counts by method, path, status
+- `http_request_duration_seconds` - Request latency histograms
+- `ai_classify_total` - Classification call counts (success/fallback)
+- `ai_cluster_total` - Clustering call counts (success/error)
+- Spring Actuator JVM/HTTP metrics
+
+**Grafana:** `http://localhost:3000` (admin/admin)  
+**Prometheus:** `http://localhost:9090`
+
+---
+
+## Communication Flow
+
+### Article Ingestion Pipeline
+
+```
+1. RSS Worker (Scheduled)
+   │
+   ├── Claims next available NewsSource (FOR UPDATE SKIP LOCKED)
+   │
+   ├── Fetches RSS feed
+   │
+   ├── For each article:
+   │   │
+   │   └── POST /classify → AI Service
+   │       │
+   │       └── Returns predicted topic
+   │
+   ├── Batch insert articles to PostgreSQL
+   │
+   ├── NOTIFY new_articles_ready → PostgreSQL
+   │   │
+   │   └── Spring App (LISTEN) receives notification
+   │       │
+   │       └── Can trigger real-time updates/notifications
+   │
+   └── When all sources processed:
+       │
+       └── POST /cluster → AI Service
+           │
+           ├── Fetches unclustered articles from DB
+           ├── Generates embeddings
+           ├── Clusters using FAISS
+           └── Updates article cluster_id in DB
+```
+
+
+### Inter-Service Communication
+
+| Source | Target | Protocol | Endpoint | Purpose |
+|--------|--------|----------|----------|---------|
+| RSS Worker | AI Service | HTTP | POST `/classify` | Topic classification |
+| RSS Worker | AI Service | HTTP | POST `/cluster` | Trigger clustering |
+| RSS Worker | PostgreSQL | JDBC | - | Article storage, job coordination |
+| RSS Worker | Spring App | PostgreSQL NOTIFY | `new_articles_ready` | Signal new articles available |
+| AI Service | PostgreSQL | psycopg2 | - | Fetch articles for clustering |
+| Spring App | PostgreSQL | JDBC | - | All CRUD operations |
+
+### PostgreSQL NOTIFY/LISTEN
+
+The system uses PostgreSQL's built-in pub/sub mechanism for real-time inter-service communication
+
+This allows the Spring App to react immediately when new articles are inserted, enabling real-time features like push notifications to users without polling.
+
+
+### Service URLs
+
+| Service | URL |
+|---------|-----|
+| REST API | http://localhost:8080 |
+| AI Service | http://localhost:8002 |
+| Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 |
+
+---
 
 ## API Documentation
 
-### Authentication Endpoints
+### Authentication
 
-#### POST `/api/auth/register`
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/register` | POST | Register new user |
+| `/api/auth/login` | POST | Login and get JWT token |
 
-Registers a new user.
-
-**Request Body:**
-
-```json
-{
-  "username": "john_doe",
-  "email": "john@example.com",
-  "password": "SecurePass123"
-}
-```
-
-**Responses:**
-
-* **200 OK**
-
-  ```
-  User registered successfully
-  ```
-
-* **400 Bad Request**
-
-  ```
-  Email already exists
-  ```
-
-* **409 Conflict**
-
-  ```
-  Username already exists
-  ```
-
-* **500 Internal Server Error**
-
-  ```
-  An error occurred during registration : {error message}
-  ```
-
----
-
-#### POST `/api/auth/login`
-
-Authenticates a user and returns an authentication token.
-
-**Request Body:**
-
-```json
-{
-  "username": "john_doe",
-  "password": "SecurePass123"
-}
-```
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  {
-    "token": "jwt-token-example",
-    "message": "Login successful"
-  }
-  ```
-
-* **400 Bad Request**
-
-  ```json
-  {
-    "message": "Invalid credentials"
-  }
-  ```
-
-* **500 Internal Server Error**
-
-  ```json
-  {
-    "message": "An error occurred: {error message}"
-  }
-  ```
-
----
-
-### ADMIN Endpoints
-
-Requires `ADMIN` role for access.
-
-
-#### GET `/api/admin/users`
-
-Retrieves all registered users.
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  [
-    {
-      "username": "admin",
-      "email": "admin@example.com",
-      "roles": ["ADMIN"]
-    },
-    {
-      "username": "john_doe",
-      "email": "john@example.com",
-      "roles": ["USER"]
-    }
-  ]
-  ```
-
-* **500 Internal Server Error**
-
-  ```json
-  null
-  ```
-
-#### GET `/api/admin/users/{username}`
-
-Fetches information for a specific user.
-
-**Path Parameter:**
-
-* `username` (String): The username to look up.
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  {
-    "username": "john_doe",
-    "email": "john@example.com",
-    "roles": ["USER"]
-  }
-  ```
-
-* **404 Not Found**
-
-  ```json
-  null
-  ```
-
-* **500 Internal Server Error**
-
-  ```json
-  null
-  ```
-
-
-#### DELETE `/api/admin/users/{username}`
-
-Deletes a user from the system.
-
-**Path Parameter:**
-
-* `username` (String)
-
-**Responses:**
-
-* **200 OK**
-
-  ```
-  User deleted successfully
-  ```
-
-* **404 Not Found**
-
-  ```
-  User not found
-  ```
-
-* **500 Internal Server Error**
-
-  ```
-  An error occurred while deleting the user {username}
-  ```
-
-#### POST `/api/admin/news_source`
-
-Adds a new news source for monitoring.
-
-**Request Body:**
-
-```json
-{
-  "name": "BBC",
-  "baseUrl": "https://www.bbc.com",
-  "rssUrl": "https://feeds.bbci.co.uk/news/rss.xml"
-}
-```
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  {
-    "id": 4,
-    "name": "BBC",
-    "baseUrl": "https://www.bbc.com",
-    "rssUrl": "https://feeds.bbci.co.uk/news/rss.xml"
-  }
-  ```
-
-* **409 Conflict**
-
-  ```json
-  null
-  ```
-
-* **500 Internal Server Error**
-
-  ```json
-  null
-  ```
-
-
-#### DELETE `/api/admin/news_source/{id}`
-
-Deletes a news source by its ID.
-
-**Path Parameter:**
-
-* `id` (Long)
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  {
-    "id": 4,
-    "name": "BBC",
-    "baseUrl": "https://www.bbc.com",
-    "rssUrl": "https://feeds.bbci.co.uk/news/rss.xml"
-  }
-  ```
-
-* **404 Not Found**
-
-  ```json
-  null
-  ```
-
-* **500 Internal Server Error**
-
-  ```json
-  null
-  ```
-
-
-#### DELETE `/api/admin/purge_all`
-
-Deletes all stored articles in the system.
-
-**Responses:**
-
-* **200 OK**
-
-  ```
-  All articles deleted successfully
-  ```
-
-* **500 Internal Server Error**
-
-  ```
-  An error occurred while deleting all articles: {error message}
-  ```
-
----
 ### Feed Endpoints
 
-Requires no authentication for access.
-
-#### GET `/api/feed/topics`
-
-Retrieves a list of all available topics.
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  [
-    {
-      "id": 1,
-      "name": "Politics"
-    },
-    {
-      "id": 2,
-      "name": "Technology"
-    }
-  ]
-  ```
-
-* **500 Internal Server Error**
-
-  ```json
-  null
-  ```
-
-
-
-#### GET `/api/feed/news_sources`
-
-Returns all registered news sources.
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  [
-    {
-      "id": 1,
-      "name": "BBC",
-      "baseUrl": "https://www.bbc.com",
-      "rssUrl": "https://feeds.bbci.co.uk/news/rss.xml"
-    },
-    {
-      "id": 2,
-      "name": "CNN",
-      "baseUrl": "https://www.cnn.com",
-      "rssUrl": "https://rss.cnn.com/rss/edition.rss"
-    }
-  ]
-  ```
-
-* **500 Internal Server Error**
-
-  ```json
-  null
-  ```
-
-
-
-#### GET `/api/feed/articles`
-
-Returns all available articles.
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  [
-    {
-      "id": 101,
-      "title": "Economic Forecast Released",
-      "content": "Details about economic report...",
-      "topicName": "Economy",
-      "sourceName": "Reuters"
-    },
-    ...
-  ]
-  ```
-
-* **500 Internal Server Error**
-
-  ```json
-  null
-  ```
-
-
-#### GET `/api/feed/articles/{topicName}`
-
-Returns articles filtered by topic name.
-
-**Path Parameter:**
-
-* `topicName` (String): Name of the topic.
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  [
-    {
-      "id": 202,
-      "title": "New Tech Innovations",
-      "content": "Highlights from tech summit...",
-      "topicName": "Technology",
-      "sourceName": "Wired"
-    }
-  ]
-  ```
-
-* **404 Not Found**
-
-  ```json
-  null
-  ```
-
-* **500 Internal Server Error**
-
-  ```json
-  null
-  ```
-
-
-
-#### GET `/api/feed/articles/by_cluster/{clusterId}`
-
-Retrieves all articles that belong to a specific cluster.
-
-**Path Parameter:**
-
-* `clusterId` (Long): Cluster identifier.
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  [
-    {
-      "id": 301,
-      "title": "Climate Policy Agreement Reached",
-      "clusterId": 5,
-      "topicName": "Environment"
-    },
-    ...
-  ]
-  ```
-
-* **500 Internal Server Error**
-
-  ```json
-  null
-  ```
-
-
-#### POST `/api/feed/search`
-
-Searches for articles based on full-text input.
-
-**Request Body:**
-
-```json
-{
-  "query": "energy crisis",
-  "filters": {
-    "topics": ["Politics", "Environment"],
-    "sources": ["BBC"]
-  }
-}
-```
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  [
-    {
-      "id": 400,
-      "title": "Energy Crisis Deepens",
-      "content": "Europe faces new energy concerns...",
-      "topicName": "Politics",
-      "sourceName": "BBC"
-    }
-  ]
-  ```
-
-* **500 Internal Server Error**
-
-  ```json
-  null
-  ```
-
---- 
-### User Endpoints
-
-
-Requires authentication via JWT for all endpoints.
-
-#### GET `/api/user/profile/{username}`
-
-Retrieves the authenticated user's profile and notifications.
-
-**Path Parameter:**
-
-* `username` (String): Must match the currently authenticated user.
-
-**Authentication:** Required (JWT)
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  {
-    "username": "john_doe",
-    "email": "john@example.com",
-    "roles": ["USER"]
-  }
-  ```
-
-* **403 Forbidden**
-
-  ```
-  null
-  ```
-
-* **404 Not Found**
-
-  ```
-  null
-  ```
-
-* **500 Internal Server Error**
-
-  ```
-  null
-  ```
-
-
-
-#### POST `/api/user/subscribe/{topicId}`
-
-Subscribes the authenticated user to a specific topic.
-
-**Path Parameter:**
-
-* `topicId` (Long): ID of the topic to subscribe to.
-
-**Authentication:** Required (JWT)
-
-**Responses:**
-
-* **200 OK**
-
-  ```json
-  {
-    "id": 3,
-    "name": "Technology"
-  }
-  ```
-
-* **404 Not Found**
-
-  ```
-  null
-  ```
-
-* **409 Conflict**
-
-  ```
-  null
-  ```
-
-* **500 Internal Server Error**
-
-  ```
-  null
-  ```
-
-#### DELETE `/api/user/unsubscribe/{topicId}`
-
-Unsubscribes the authenticated user from a specific topic.
-
-**Path Parameter:**
-
-* `topicId` (Long): ID of the topic to unsubscribe from.
-
-**Authentication:** Required (JWT)
-
-**Responses:**
-
-* **204 No Content**
-
-* **404 Not Found**
-
-* **500 Internal Server Error**
-
----
-
-### Monitoring Activity Endpoints
-
-#### GET `http://localhost:9090`
-
-Prometheus metrics endpoint for monitoring application performance and health, accessible without authentication.
-
-####  GET `http://localhost:8080/actuator/health`
-
-Spring Boot Actuator health check endpoint to verify application status, accessible without authentication.
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/feed/topics` | GET | User | List all topics |
+| `/api/feed/sources` | GET | User | List all news sources |
+| `/api/feed/articles` | GET | User | List all articles |
+| `/api/feed/articles/{topic}` | GET | User | Articles by topic |
+| `/api/feed/search` | POST | User | Search articles |
+
+### Admin Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/admin/users` | GET | Admin | List all users |
+| `/api/admin/sources` | POST | Admin | Add news source |
+| `/api/admin/sources/{id}` | DELETE | Admin | Remove news source |
 
