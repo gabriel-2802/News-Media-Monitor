@@ -1,0 +1,170 @@
+{
+  "run_at": "2026-06-26T17:42:32.326031",
+  "sources": [
+    {
+      "source": "bbc",
+      "rss_url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+      "rss_ok": true,
+      "entry_count": 36,
+      "probe_url": "https://www.bbc.co.uk/news/articles/c0jydyz8z6jo",
+      "meta_title": true,
+      "meta_author": false,
+      "meta_date": true,
+      "js_required": false
+    },
+    {
+      "source": "guardian",
+      "rss_url": "https://www.theguardian.com/world/rss",
+      "rss_ok": true,
+      "entry_count": 45,
+      "probe_url": "https://www.theguardian.com/world/2026/jun/26/cape-verde-world-cup-run-delights-diaspora-community-uk",
+      "meta_title": true,
+      "meta_author": true,
+      "meta_date": true,
+      "js_required": false
+    },
+    {
+      "source": "aljazeera",
+      "rss_url": "https://www.aljazeera.com/xml/rss/all.xml",
+      "rss_ok": true,
+      "entry_count": 25,
+      "probe_url": "https://www.aljazeera.com/news/2026/6/26/dr-congo-files-case-against-rwanda-at-icj-over-decades-of-alleged-abuses",
+      "meta_title": true,
+      "meta_author": false,
+      "meta_date": true,
+      "js_required": false
+    },
+    {
+      "source": "npr",
+      "rss_url": "https://feeds.npr.org/1001/rss.xml",
+      "rss_ok": true,
+      "entry_count": 10,
+      "probe_url": "https://www.npr.org/2026/06/26/nx-s1-5871397/world-cup-tickets-stubhub-resale-controversy",
+      "meta_title": true,
+      "meta_author": true,
+      "meta_date": true,
+      "js_required": true
+    },
+    {
+      "source": "dw",
+      "rss_url": "https://rss.dw.com/rdf/rss-en-all",
+      "rss_ok": true,
+      "entry_count": 149,
+      "probe_url": "https://www.dw.com/en/creative-climate-messaging-and-other-eco-wins-of-the-week/a-77727778",
+      "meta_title": true,
+      "meta_author": false,
+      "meta_date": true,
+      "js_required": false
+    },
+    {
+      "source": "france24",
+      "rss_url": "https://www.france24.com/en/rss",
+      "rss_ok": true,
+      "entry_count": 24,
+      "probe_url": "https://www.france24.com/en/africa/20260626-dr-congo-patients-cured-doctors-warn-outbreak-far-contained",
+      "meta_title": true,
+      "meta_author": true,
+      "meta_date": true,
+      "js_required": false
+    },
+    {
+      "source": "cbc",
+      "rss_url": "https://www.cbc.ca/cmlink/rss-world",
+      "rss_ok": true,
+      "entry_count": 20,
+      "probe_url": "https://www.cbc.ca/news/world/venezuela-earthquake-death-toll-rises-people-trapped-9.7249673",
+      "meta_title": true,
+      "meta_author": false,
+      "meta_date": true,
+      "js_required": true
+    },
+    {
+      "source": "abc_au",
+      "rss_url": "https://www.abc.net.au/news/feed/51120/rss.xml",
+      "rss_ok": true,
+      "entry_count": 25,
+      "probe_url": "https://www.abc.net.au/news/2026-06-26/police-close-roads-near-beijings-tallest-building-/106849906",
+      "meta_title": true,
+      "meta_author": false,
+      "meta_date": true,
+      "js_required": false
+    },
+    {
+      "source": "euronews",
+      "rss_url": "https://www.euronews.com/rss",
+      "rss_ok": true,
+      "entry_count": 50,
+      "probe_url": "http://www.euronews.com/2026/06/26/help-we-are-trapped-venezuela-earthquake-victims-turn-to-euronews-tiktok-to-beg-for-rescue",
+      "meta_title": true,
+      "meta_author": false,
+      "meta_date": true,
+      "js_required": false
+    },
+    {
+      "source": "sky",
+      "rss_url": "https://feeds.skynews.com/feeds/rss/world.xml",
+      "rss_ok": true,
+      "entry_count": 7,
+      "probe_url": "https://news.sky.com/story/plane-crashed-into-beijings-tallest-building-witnesses-say-13558050",
+      "meta_title": true,
+      "meta_author": false,
+      "meta_date": true,
+      "js_required": true
+    },
+    {
+      "source": "independent",
+      "rss_url": "https://www.independent.co.uk/news/world/rss",
+      "rss_ok": true,
+      "entry_count": 95,
+      "probe_url": "https://www.independent.co.uk/news/world/americas/red-lobster-endless-shrimp-lawsuit-b3003869.html",
+      "meta_title": true,
+      "meta_author": true,
+      "meta_date": true,
+      "js_required": false
+    },
+    {
+      "source": "thehill",
+      "rss_url": "https://thehill.com/feed",
+      "rss_ok": true,
+      "entry_count": 100,
+      "probe_url": "https://thehill.com/policy/international/5942784-iran-asserts-strait-hormuz/",
+      "meta_title": true,
+      "meta_author": true,
+      "meta_date": true,
+      "js_required": false
+    },
+    {
+      "source": "vox",
+      "rss_url": "https://www.vox.com/rss/index.xml",
+      "rss_ok": true,
+      "entry_count": 10,
+      "probe_url": "https://www.vox.com/politics/493329/trump-military-iran-guardians-hormuz",
+      "meta_title": true,
+      "meta_author": true,
+      "meta_date": true,
+      "js_required": false
+    },
+    {
+      "source": "time",
+      "rss_url": "https://time.com/feed",
+      "rss_ok": true,
+      "entry_count": 25,
+      "probe_url": "https://time.com/article/2026/06/26/does-pickle-juice-help-muscle-cramps/",
+      "meta_title": true,
+      "meta_author": true,
+      "meta_date": true,
+      "js_required": false
+    },
+    {
+      "source": "rt",
+      "rss_url": "https://www.rt.com/rss/news",
+      "rss_ok": true,
+      "entry_count": 100,
+      "probe_url": "https://www.rt.com/news/642235-armenia-turkiye-gamble-price/",
+      "meta_title": true,
+      "meta_author": true,
+      "meta_date": true,
+      "js_required": false
+    }
+  ]
+}
