@@ -1,0 +1,15 @@
+MERGE (:NewsSource {name: "bbc",         base_url: "https://www.bbc.co.uk",        rss_url: "https://feeds.bbci.co.uk/news/world/rss.xml"});
+MERGE (:NewsSource {name: "guardian",    base_url: "https://www.theguardian.com",   rss_url: "https://www.theguardian.com/world/rss"});
+MERGE (:NewsSource {name: "aljazeera",   base_url: "https://www.aljazeera.com",     rss_url: "https://www.aljazeera.com/xml/rss/all.xml"});
+MERGE (:NewsSource {name: "npr",         base_url: "https://www.npr.org",           rss_url: "https://feeds.npr.org/1001/rss.xml"});
+MERGE (:NewsSource {name: "dw",          base_url: "https://www.dw.com",            rss_url: "https://rss.dw.com/rdf/rss-en-all"});
+MERGE (:NewsSource {name: "france24",    base_url: "https://www.france24.com",      rss_url: "https://www.france24.com/en/rss"});
+MERGE (:NewsSource {name: "cbc",         base_url: "https://www.cbc.ca",            rss_url: "https://www.cbc.ca/cmlink/rss-world"});
+MERGE (:NewsSource {name: "abc_au",      base_url: "https://www.abc.net.au",        rss_url: "https://www.abc.net.au/news/feed/51120/rss.xml"});
+MERGE (:NewsSource {name: "euronews",    base_url: "https://www.euronews.com",      rss_url: "https://www.euronews.com/rss"});
+MERGE (:NewsSource {name: "sky",         base_url: "https://news.sky.com",          rss_url: "https://feeds.skynews.com/feeds/rss/world.xml"});
+MERGE (:NewsSource {name: "independent", base_url: "https://www.independent.co.uk", rss_url: "https://www.independent.co.uk/news/world/rss"});
+MERGE (:NewsSource {name: "thehill",     base_url: "https://thehill.com",           rss_url: "https://thehill.com/feed"});
+MERGE (:NewsSource {name: "vox",         base_url: "https://www.vox.com",           rss_url: "https://www.vox.com/rss/index.xml"});
+MERGE (:NewsSource {name: "time",        base_url: "https://time.com",              rss_url: "https://time.com/feed"});
+MERGE (:NewsSource {name: "rt",          base_url: "https://www.rt.com",            rss_url: "https://www.rt.com/rss/news"});

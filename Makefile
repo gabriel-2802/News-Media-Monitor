@@ -1,0 +1,166 @@
+.DEFAULT_GOAL := help
+
+COMPOSE           := docker compose
+NEO4J_PASSWORD    ?= secretsecret
+RABBITMQ_USER     ?= admin
+RABBITMQ_PASSWORD ?= secret
+RABBITMQ_VHOST    ?= news_monitor
+
+MIGRATIONS := $(COMPOSE) run --rm neo4j-migrations
+
+.PHONY: help
+help: ## Show available targets
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} \
+	  /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-28s\033[0m %s\n", $$1, $$2 }' \
+	  $(MAKEFILE_LIST)
+
+# ── Bootstrap ──────────────────────────────────────────────────────────────────
+
+.PHONY: env
+env: ## Copy .env.example → .env (skips if .env already exists)
+	@if [ -f .env ]; then \
+		echo ".env already exists — skipping."; \
+	else \
+		cp .env.example .env && echo "Created .env from .env.example."; \
+	fi
+
+.PHONY: dev
+dev: env up ## Bootstrap the dev environment: create .env then start all services
+	@echo ""
+	@echo "Neo4j    → http://localhost:7474  (neo4j / $(NEO4J_PASSWORD))"
+	@echo "RabbitMQ → http://localhost:15672 ($(RABBITMQ_USER) / $(RABBITMQ_PASSWORD))"
+
+# ── Infrastructure ─────────────────────────────────────────────────────────────
+
+.PHONY: up
+up: ## Start all services in the background
+	$(COMPOSE) up -d
+
+.PHONY: down
+down: ## Stop all services
+	$(COMPOSE) down
+
+.PHONY: restart
+restart: ## Restart all services
+	$(COMPOSE) restart
+
+.PHONY: pull
+pull: ## Pull the latest Docker images
+	$(COMPOSE) pull
+
+.PHONY: ps
+ps: ## Show running containers and their health status
+	$(COMPOSE) ps
+
+.PHONY: status
+status: ps
+
+# ── Logs ───────────────────────────────────────────────────────────────────────
+
+.PHONY: logs
+logs: ## Stream logs for all services (Ctrl-C to stop)
+	$(COMPOSE) logs -f
+
+.PHONY: logs-neo4j
+logs-neo4j: ## Stream Neo4j logs
+	$(COMPOSE) logs -f neo4j
+
+.PHONY: logs-rabbitmq
+logs-rabbitmq: ## Stream RabbitMQ logs
+	$(COMPOSE) logs -f rabbitmq
+
+.PHONY: logs-migrations
+logs-migrations: ## Show the neo4j-migrations run output
+	$(COMPOSE) logs neo4j-migrations
+
+.PHONY: logs-setup
+logs-setup: ## Show the rabbitmq-setup run output
+	$(COMPOSE) logs rabbitmq-setup
+
+# ── Cleanup ────────────────────────────────────────────────────────────────────
+
+.PHONY: clean
+clean: ## Stop services and DELETE all volumes — DESTRUCTIVE
+	@echo "WARNING: this removes all persisted Neo4j and RabbitMQ data."
+	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ]
+	$(COMPOSE) down -v --remove-orphans
+
+.PHONY: clean-images
+clean-images: clean ## Remove volumes and prune dangling images
+	docker image prune -f
+
+# ── Neo4j ──────────────────────────────────────────────────────────────────────
+
+.PHONY: neo4j-shell
+neo4j-shell: ## Open an interactive Cypher Shell session
+	$(COMPOSE) exec neo4j cypher-shell -u neo4j -p $(NEO4J_PASSWORD)
+
+.PHONY: neo4j-url
+neo4j-url: ## Print the Neo4j Browser URL and credentials
+	@echo "Neo4j Browser → http://localhost:7474"
+	@echo "  username : neo4j"
+	@echo "  password : $(NEO4J_PASSWORD)"
+
+.PHONY: neo4j-wait
+neo4j-wait: ## Block until Neo4j accepts connections
+	@printf "Waiting for Neo4j"
+	@until $(COMPOSE) exec -T neo4j cypher-shell -u neo4j -p $(NEO4J_PASSWORD) "RETURN 1" > /dev/null 2>&1; do \
+		printf "."; sleep 3; \
+	done
+	@echo " ready."
+
+# ── Migrations ─────────────────────────────────────────────────────────────────
+
+.PHONY: migrate
+migrate: ## Apply all pending Neo4j migrations
+	$(MIGRATIONS)
+
+.PHONY: migrate-info
+migrate-info: ## List applied migrations stored in Neo4j
+	$(COMPOSE) exec neo4j cypher-shell -u neo4j -p $(NEO4J_PASSWORD) \
+	  "MATCH (m:\`__Migration\`) RETURN m.version, m.filename, m.applied_at ORDER BY m.version;"
+
+.PHONY: migrate-clean
+migrate-clean: ## Delete all migration tracking nodes — dev only, DESTRUCTIVE
+	@echo "WARNING: this removes all migration history from Neo4j (does not undo schema changes)."
+	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ]
+	$(COMPOSE) exec neo4j cypher-shell -u neo4j -p $(NEO4J_PASSWORD) \
+	  "MATCH (m:\`__Migration\`) DELETE m;"
+
+# ── RabbitMQ ───────────────────────────────────────────────────────────────────
+
+.PHONY: rabbitmq-setup
+rabbitmq-setup: ## Re-run topology setup (idempotent — safe to repeat)
+	$(COMPOSE) run --rm rabbitmq-setup
+
+.PHONY: rabbitmq-url
+rabbitmq-url: ## Print the RabbitMQ Management UI URL and credentials
+	@echo "RabbitMQ Management → http://localhost:15672"
+	@echo "  username : $(RABBITMQ_USER)"
+	@echo "  password : $(RABBITMQ_PASSWORD)"
+	@echo "  vhost    : $(RABBITMQ_VHOST)"
+
+.PHONY: rabbitmq-shell
+rabbitmq-shell: ## Open a bash shell inside the RabbitMQ container
+	$(COMPOSE) exec rabbitmq bash
+
+.PHONY: rabbitmq-list-queues
+rabbitmq-list-queues: ## List queues on the news_monitor vhost
+	$(COMPOSE) exec rabbitmq rabbitmqctl list_queues \
+		-p $(RABBITMQ_VHOST) name messages consumers state
+
+.PHONY: rabbitmq-list-exchanges
+rabbitmq-list-exchanges: ## List exchanges on the news_monitor vhost
+	$(COMPOSE) exec rabbitmq rabbitmqctl list_exchanges \
+		-p $(RABBITMQ_VHOST) name type durable auto_delete
+
+.PHONY: rabbitmq-list-bindings
+rabbitmq-list-bindings: ## List bindings on the news_monitor vhost
+	$(COMPOSE) exec rabbitmq rabbitmqctl list_bindings \
+		-p $(RABBITMQ_VHOST)
+
+.PHONY: rabbitmq-purge-scrape-jobs
+rabbitmq-purge-scrape-jobs: ## Purge the scrape.jobs queue — DESTRUCTIVE
+	@echo "WARNING: all queued messages in scrape.jobs will be discarded."
+	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ]
+	$(COMPOSE) exec rabbitmq rabbitmqctl purge_queue scrape.jobs -p $(RABBITMQ_VHOST)
