@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: provider
+  neo4j:
+    uri: bolt://localhost:7687
+    authentication:
+      username: neo4j
+      password: secretsecret
+  data:
+    neo4j:
+      database: neo4j
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
