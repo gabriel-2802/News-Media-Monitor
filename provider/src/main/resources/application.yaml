@@ -17,3 +17,9 @@ springdoc:
     path: /swagger-ui.html
     operationsSorter: method
     tagsSorter: alpha
+
+logging:
+  level:
+    data:
+      provider:
+        util=DEBUG:

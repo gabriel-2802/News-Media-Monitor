@@ -17,6 +17,8 @@ public class Util {
     private static final int PING_SUCCESS_STATUS_MAX = 400;
     private static final String URL_PING_FAILED_LOG = "Failed to reach URL: {}";
     private static final String INTERRUPTED_EXCEPTION_LOG = "Thread was interrupted while trying to reach URL: {}";
+    private static final String URL_PING_ATTEMPT_LOG = "Pinging URL: {}";
+    private static final String URL_PING_RESPONSE_LOG = "URL {} responded with status {}";
 
     private static final HttpClient CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
@@ -25,6 +27,8 @@ public class Util {
     private Util() {}
 
     public static boolean isNotReachable(final String url) {
+        log.debug(URL_PING_ATTEMPT_LOG, url);
+
         try {
             final HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -33,6 +37,9 @@ public class Util {
                     .build();
 
             final HttpResponse<Void> response = CLIENT.send(request, HttpResponse.BodyHandlers.discarding());
+
+            log.debug(URL_PING_RESPONSE_LOG, url, response.statusCode());
+
             return response.statusCode() < PING_SUCCESS_STATUS_MIN
                     || response.statusCode() >= PING_SUCCESS_STATUS_MAX;
         } catch (InterruptedException e) {
@@ -44,5 +51,8 @@ public class Util {
             return true;
         }
     }
-}
 
+    public static String extractDomain(final String url) {
+        return URI.create(url).getHost();
+    }
+}

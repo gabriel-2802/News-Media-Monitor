@@ -12,6 +12,9 @@ public final class Constants {
     public static final String NEWS_SOURCE_NAME_EXISTS_ERROR = "News source with name = {} already exists.";
     public static final String NEWS_SOURCE_RSS_URL_EXISTS_ERROR = "News source with RSS URL = {} already exists.";
     public static final String NEWS_SOURCE_URLS_UNREACHABLE_ERROR = "News source URLs are not reachable: baseUrl = {}, rssUrl = {}.";
+    public static final String NEWS_SOURCE_DOMAIN_MISMATCH_LOG = "News source domain mismatch: baseUrl={}, rssUrl={}";
+    public static final String NEWS_SOURCE_DOMAIN_MISMATCH_ERROR = "RSS URL domain does not match base URL domain: baseUrl = {}, rssUrl = {}.";
+    public static final String NEWS_SOURCE_ADD_SUCCESS_LOG = "News source saved successfully: name={}, id={}";
 
     // paths
     public static final String ARTICLES_BASE_PATH = "/api/articles";
@@ -19,6 +22,7 @@ public final class Constants {
     public static final String ARTICLES_EXISTS_PATH = "/exists";
     public static final String NEWS_SOURCES_BASE_PATH = "/api/news-sources";
     public static final String NEWS_SOURCE_FAILURE_PATH = "/{sourceName}/failure";
+
 
     // aux
     public static final String DEFAULT_PAGE = "0";

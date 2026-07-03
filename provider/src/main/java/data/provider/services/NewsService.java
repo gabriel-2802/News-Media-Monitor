@@ -36,6 +36,11 @@ public class NewsService {
             throw new BusinessException(Constants.NEWS_SOURCE_RSS_URL_EXISTS_ERROR, newsSourceRequest.rssUrl());
         }
 
+        if (!newsSourceRequest.rssUrl().contains(Util.extractDomain(newsSourceRequest.baseUrl()))) {
+            throw new BusinessException(Constants.NEWS_SOURCE_DOMAIN_MISMATCH_ERROR,
+                    newsSourceRequest.baseUrl(), newsSourceRequest.rssUrl());
+        }
+
         if (Util.isNotReachable(newsSourceRequest.rssUrl()) || Util.isNotReachable(newsSourceRequest.baseUrl())) {
             throw new BusinessException(Constants.NEWS_SOURCE_URLS_UNREACHABLE_ERROR,
                     newsSourceRequest.baseUrl(), newsSourceRequest.rssUrl());
@@ -48,6 +53,8 @@ public class NewsService {
                 .build();
 
         newsSourceRepository.save(source);
+        log.info(Constants.NEWS_SOURCE_ADD_SUCCESS_LOG, source.getName(), source.getId());
+
         return new NewsSourceDto(source, 0);
     }
 

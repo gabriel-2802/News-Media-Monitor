@@ -25,7 +25,7 @@ public record ArticleRequest(
         @Schema(description = "Full extracted article text.", requiredMode = Schema.RequiredMode.REQUIRED)
         String bodyText,
 
-        @NotNull @NotEmpty
+        @NotNull
         @Schema(description = "Timestamp the article was published by the source.", example = "2026-07-01T14:30:00",
                 requiredMode = Schema.RequiredMode.REQUIRED)
         LocalDateTime publishedAt,

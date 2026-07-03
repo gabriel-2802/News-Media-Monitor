@@ -10,35 +10,37 @@ public interface ArticleRepository extends Neo4jRepository<Article, String> {
 
     @Query(
             value = """
-                MATCH (s:NewsSource)-[:PUBLISHED]->(a:Article)
-                RETURN a, s, [(s)-[r:PUBLISHED]->(a) | r]
-                ORDER BY a.publishedAt DESC
-                """,
+            MATCH (s:NewsSource)-[:PUBLISHED]->(a:Article)
+            RETURN a, s, [(s)-[r:PUBLISHED]->(a) | r]
+            ORDER BY a.publishedAt DESC
+            SKIP $skip LIMIT $limit
+            """,
             countQuery = """
-                MATCH (:NewsSource)-[:PUBLISHED]->(a:Article)
-                RETURN count(a)
-                """
+            MATCH (:NewsSource)-[:PUBLISHED]->(a:Article)
+            RETURN count(a)
+            """
     )
     Page<Article> findAllWithSource(Pageable pageable);
+
+    @Query(
+            value = """
+            MATCH (s:NewsSource {name: $sourceName})-[:PUBLISHED]->(a:Article)
+            RETURN a, s, [(s)-[r:PUBLISHED]->(a) | r]
+            ORDER BY a.publishedAt DESC
+            SKIP $skip LIMIT $limit
+            """,
+            countQuery = """
+            MATCH (:NewsSource {name: $sourceName})-[:PUBLISHED]->(a:Article)
+            RETURN count(a)
+            """
+    )
+    Page<Article> findBySourceName(String sourceName, Pageable pageable);
 
     @Query("""
             MATCH (n:NewsSource {name: $sourceName})-[:PUBLISHED]->(a:Article)
             RETURN count(a)
             """)
     long countArticlesBySource(String sourceName);
-
-    @Query(
-            value = """
-                MATCH (s:NewsSource {name: $sourceName})-[:PUBLISHED]->(a:Article)
-                RETURN a, s, [(s)-[r:PUBLISHED]->(a) | r]
-                ORDER BY a.publishedAt DESC
-                """,
-            countQuery = """
-                MATCH (:NewsSource {name: $sourceName})-[:PUBLISHED]->(a:Article)
-                RETURN count(a)
-                """
-    )
-    Page<Article> findBySourceName(String sourceName, Pageable pageable);
 
     boolean existsByUrl(String url);
 }

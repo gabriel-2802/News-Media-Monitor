@@ -15,6 +15,8 @@ public class NewsSource {
     private String name;
     private String baseUrl;
     private String rssUrl;
+    @Builder.Default
     private Integer failureCount = 0;
+    @Builder.Default
     private Boolean isDisabled = false;
 }
