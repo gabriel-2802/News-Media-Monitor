@@ -10,6 +10,7 @@ REST API for registering news sources and ingesting/querying scraped articles. B
 
 - [News Sources](#news-sources)
   - [`GET /api/news-sources`](#get-apinews-sources)
+  - [`GET /api/news-sources/{sourceName}`](#get-apinews-sourcessourcename)
   - [`POST /api/news-sources`](#post-apinews-sources)
   - [`PATCH /api/news-sources/{sourceName}/failure`](#patch-apinews-sourcessourcenamefailure)
   - [`PATCH /api/news-sources/{sourceName}/reset`](#patch-apinews-sourcessourcenamereset)
@@ -48,6 +49,25 @@ List all registered news sources, paginated, including each source's article cou
 | Status | Body                        | Description                |
 |--------|-----------------------------|-----------------------------|
 | 200    | [`NewsSourceDto[]`](#newssourcedto) | Sources retrieved successfully |
+
+---
+
+### `GET /api/news-sources/{sourceName}`
+
+Get a single registered news source by name, including its article count.
+
+**Path parameters**
+
+| Name       | Type   | Description                    |
+|------------|--------|----------------------------------|
+| sourceName | string | Name of the news source, e.g. `example-news` |
+
+**Responses**
+
+| Status | Body | Description |
+|--------|------|--------------|
+| 200 | [`NewsSourceDto`](#newssourcedto) | News source retrieved successfully |
+| 400 | [`ErrorResponse`](#errorresponse) | News source does not exist |
 
 ---
 

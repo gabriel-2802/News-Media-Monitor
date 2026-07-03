@@ -44,6 +44,18 @@ public class NewsController {
         return ResponseEntity.ok(newsService.getAllNewsSources(page, count));
     }
 
+    @GetMapping(Constants.NEWS_SOURCE_BY_NAME_PATH)
+    @Operation(summary = "Get a news source by name", description = "Returns a single registered news source, including its article count.")
+    @ApiResponse(responseCode = "200", description = "News source retrieved successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = NewsSourceDto.class)))
+    @ApiResponse(responseCode = "400", description = "News source does not exist",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<NewsSourceDto> getNewsSourceByName(
+            @Parameter(description = "Name of the news source.", example = "example-news", required = true)
+            @PathVariable final String sourceName) {
+        return ResponseEntity.ok(newsService.getNewsSourceByName(sourceName));
+    }
+
     @PostMapping
     @Operation(summary = "Register a new news source", description = "Adds a news source to be scraped. Fails if a source with the same name, "
             + "base URL, or RSS URL already exists, or if either URL is unreachable.")

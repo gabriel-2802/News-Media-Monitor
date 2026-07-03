@@ -47,24 +47,14 @@ curl -sf -u "${AUTH}" -X POST "${BASE}/bindings/news_monitor/e/news_monitor/q/sc
   -H "Content-Type: application/json" \
   -d '{"routing_key":"scrape.job","arguments":{}}'
 
-echo "[setup] Creating queue: articles"
-curl -sf -u "${AUTH}" -X PUT "${BASE}/queues/news_monitor/articles" \
+echo "[setup] Creating queue: clustering"
+curl -sf -u "${AUTH}" -X PUT "${BASE}/queues/news_monitor/clustering" \
   -H "Content-Type: application/json" \
   -d '{"durable":true,"auto_delete":false,"arguments":{}}'
 
-echo "[setup] Binding articles -> news_monitor (routing_key: article.scraped)"
-curl -sf -u "${AUTH}" -X POST "${BASE}/bindings/news_monitor/e/news_monitor/q/articles" \
+echo "[setup] Binding clustering -> news_monitor (routing_key: article.clustering)"
+curl -sf -u "${AUTH}" -X POST "${BASE}/bindings/news_monitor/e/news_monitor/q/clustering" \
   -H "Content-Type: application/json" \
-  -d '{"routing_key":"article.scraped","arguments":{}}'
-
-echo "[setup] Creating queue: source.failures"
-curl -sf -u "${AUTH}" -X PUT "${BASE}/queues/news_monitor/source.failures" \
-  -H "Content-Type: application/json" \
-  -d '{"durable":true,"auto_delete":false,"arguments":{}}'
-
-echo "[setup] Binding source.failures -> news_monitor (routing_key: source.failed)"
-curl -sf -u "${AUTH}" -X POST "${BASE}/bindings/news_monitor/e/news_monitor/q/source.failures" \
-  -H "Content-Type: application/json" \
-  -d '{"routing_key":"source.failed","arguments":{}}'
+  -d '{"routing_key":"article.clustering","arguments":{}}'
 
 echo "[setup] RabbitMQ topology is ready."

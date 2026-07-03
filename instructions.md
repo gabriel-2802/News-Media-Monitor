@@ -1,4 +1,3 @@
-
 # News Media Monitoring — Clustering Architecture Plan
 
 ## 1. Goal

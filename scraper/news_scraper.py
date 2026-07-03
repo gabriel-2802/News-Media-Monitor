@@ -6,11 +6,21 @@ Architecture:
   BaseExtractor → TrafilaturaExtractor
   BaseStorage  → JsonlStorage
   Scraper      → orchestrates one source end-to-end
+
+Robustness notes (see CHANGELOG at bottom):
+  * Storage deduplicates across runs (loads existing URLs on init).
+  * robots.txt is fetched with a timeout and fails *open* with a warning,
+    rather than silently disallowing an entire source.
+  * One failing source never aborts the whole batch.
+  * Playwright reuses a single browser process across the whole run and is
+    always closed, even on Ctrl-C.
+  * HTTP retries honour Retry-After (429) and robots Crawl-delay is respected.
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 import urllib.robotparser
 from abc import ABC, abstractmethod
@@ -24,7 +34,7 @@ import trafilatura
 from bs4 import BeautifulSoup
 from dateutil import parser as dateutil_parser
 from dateutil.tz import tzoffset
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Browser, Playwright, sync_playwright
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -39,6 +49,7 @@ REQUEST_TIMEOUT: tuple[int, int] = (5, 10)
 RATE_LIMIT_SECONDS = 2.0
 MAX_RETRIES = 3
 RETRY_BACKOFF = 3.0
+MAX_RETRY_SLEEP = 60.0          # cap so a hostile Retry-After can't stall the run
 JS_LOAD_WAIT_MS = 3000
 JS_MIN_CHARS = 200
 OUTPUT_PATH = "articles.jsonl"
@@ -49,8 +60,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger(__name__)
-
-
 
 
 # ---------------------------------------------------------------------------
@@ -83,6 +92,7 @@ SOURCES: list[SourceConfig] = [
     SourceConfig(name="time",        base_url="https://time.com",               rss_url="https://time.com/feed"),
     SourceConfig(name="rt",          base_url="https://www.rt.com",             rss_url="https://www.rt.com/rss/news"),
 ]
+
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
@@ -112,9 +122,13 @@ class ScrapingStats:
     attempted: int = 0
     succeeded: int = 0
     failed: int = 0
+    skipped: int = 0
 
     def __str__(self) -> str:
-        return f"attempted={self.attempted} succeeded={self.succeeded} failed={self.failed}"
+        return (
+            f"attempted={self.attempted} succeeded={self.succeeded} "
+            f"failed={self.failed} skipped={self.skipped}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -139,9 +153,12 @@ class BaseFetcher(ABC):
     @abstractmethod
     def fetch(self, url: str) -> str: ...
 
+    def close(self) -> None:
+        """Release any held resources. No-op by default."""
+
 
 class HttpFetcher(BaseFetcher):
-    """Static HTTP fetcher with retry logic."""
+    """Static HTTP fetcher with retry logic (honours Retry-After on 429)."""
 
     def __init__(
         self,
@@ -157,29 +174,61 @@ class HttpFetcher(BaseFetcher):
         self._session.headers["User-Agent"] = user_agent
 
     def with_user_agent(self, user_agent: str) -> HttpFetcher:
-        clone = HttpFetcher(user_agent, self._timeout, self._max_retries, self._retry_backoff)
-        return clone
+        return HttpFetcher(user_agent, self._timeout, self._max_retries, self._retry_backoff)
+
+    @staticmethod
+    def _retry_after_seconds(value: Optional[str]) -> Optional[float]:
+        """Parse a Retry-After header (either delta-seconds or an HTTP date)."""
+        if not value:
+            return None
+        try:
+            return max(0.0, float(value))
+        except ValueError:
+            pass
+        try:
+            dt = dateutil_parser.parse(value)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return max(0.0, (dt - datetime.now(timezone.utc)).total_seconds())
+        except (ValueError, OverflowError):
+            return None
 
     def fetch(self, url: str) -> str:
         last_exc: Exception = RuntimeError("no attempts made")
         for attempt in range(1, self._max_retries + 1):
+            sleep_for = self._retry_backoff * attempt
             try:
                 r = self._session.get(url, timeout=self._timeout)
                 r.raise_for_status()
                 return r.text
             except requests.HTTPError as exc:
-                if exc.response is not None and exc.response.status_code in (404, 410):
+                resp = exc.response
+                status = resp.status_code if resp is not None else None
+                if status in (404, 410):
                     raise FetchError(f"Permanent HTTP error for {url}: {exc}") from exc
+                if status == 429 and resp is not None:
+                    ra = self._retry_after_seconds(resp.headers.get("Retry-After"))
+                    if ra is not None:
+                        sleep_for = ra
                 last_exc = exc
             except requests.RequestException as exc:
                 last_exc = exc
             if attempt < self._max_retries:
-                time.sleep(self._retry_backoff * attempt)
-        raise FetchError(f"Failed {url} after {self._max_retries} attempts: {last_exc}") from last_exc
+                time.sleep(min(sleep_for, MAX_RETRY_SLEEP))
+        raise FetchError(
+            f"Failed {url} after {self._max_retries} attempts: {last_exc}"
+        ) from last_exc
 
 
 class PlaywrightFetcher(BaseFetcher):
-    """Headless browser fetcher for JS-heavy pages."""
+    """
+    Headless browser fetcher for JS-heavy pages.
+
+    The Playwright driver and Chromium process are started lazily and reused
+    across every fetch, then torn down via close(). Each fetch gets a fresh,
+    isolated browser context (own cookies) so pages don't leak state, but we
+    do NOT pay the cost of launching a browser per article.
+    """
 
     def __init__(
         self,
@@ -190,22 +239,45 @@ class PlaywrightFetcher(BaseFetcher):
         self._user_agent = user_agent
         self._load_wait_ms = load_wait_ms
         self._timeout_ms = timeout_ms
+        self._pw: Optional[Playwright] = None
+        self._browser: Optional[Browser] = None
+
+    def _ensure_browser(self) -> None:
+        if self._pw is None:
+            self._pw = sync_playwright().start()
+        assert self._pw is not None
+        if self._browser is None or not self._browser.is_connected():
+            self._browser = self._pw.chromium.launch(headless=True, args=["--disable-http2"])
 
     def fetch(self, url: str) -> str:
         try:
-            with sync_playwright() as pw:
-                browser = pw.chromium.launch(headless=True, args=["--disable-http2"])
-                page = browser.new_context(user_agent=self._user_agent).new_page()
-                try:
-                    page.goto(url, timeout=self._timeout_ms, wait_until="domcontentloaded")
-                    page.wait_for_timeout(self._load_wait_ms)
-                    return page.content()
-                finally:
-                    browser.close()
-        except FetchError:
-            raise
+            self._ensure_browser()
+            assert self._browser is not None
+            context = self._browser.new_context(user_agent=self._user_agent)
+            try:
+                page = context.new_page()
+                page.goto(url, timeout=self._timeout_ms, wait_until="domcontentloaded")
+                page.wait_for_timeout(self._load_wait_ms)
+                return str(page.content())
+            finally:
+                context.close()
         except Exception as exc:
             raise FetchError(f"Browser fetch failed for {url}: {exc}") from exc
+
+    def close(self) -> None:
+        try:
+            if self._browser is not None:
+                self._browser.close()
+        except Exception as exc:  # pragma: no cover - best-effort teardown
+            log.warning("Error closing browser: %s", exc)
+        finally:
+            self._browser = None
+            if self._pw is not None:
+                try:
+                    self._pw.stop()
+                except Exception as exc:  # pragma: no cover
+                    log.warning("Error stopping Playwright: %s", exc)
+                self._pw = None
 
 
 class SmartFetcher(BaseFetcher):
@@ -222,14 +294,21 @@ class SmartFetcher(BaseFetcher):
         browser: PlaywrightFetcher,
         min_chars: int = JS_MIN_CHARS,
     ) -> None:
-        self._http         = http
+        self._http            = http
         self._http_browser_ua = http.with_user_agent(BROWSER_UA)
-        self._browser      = browser
-        self._min_chars    = min_chars
+        self._browser         = browser
+        self._min_chars       = min_chars
 
     def _body_length(self, html: str, url: str) -> int:
-        raw = trafilatura.bare_extraction(html, url=url, include_comments=False, include_tables=False, as_dict=True)
-        return len(str((raw or {}).get("text") or ""))  # type: ignore[union-attr]
+        try:
+            raw = trafilatura.bare_extraction(
+                html, url=url, include_comments=False, include_tables=False, as_dict=True
+            )
+        except Exception:
+            return 0
+        if not isinstance(raw, dict):
+            return 0
+        return len(str(raw.get("text") or ""))
 
     def fetch(self, url: str) -> str:
         # 1. Try bot UA static fetch
@@ -254,6 +333,9 @@ class SmartFetcher(BaseFetcher):
         log.info("SmartFetcher %s: Playwright", url)
         return self._browser.fetch(url)
 
+    def close(self) -> None:
+        self._browser.close()
+
 
 # ---------------------------------------------------------------------------
 # Extractor
@@ -267,10 +349,17 @@ class BaseExtractor(ABC):
 
 class TrafilaturaExtractor(BaseExtractor):
     def extract(self, html: str, url: str) -> str:
-        raw = trafilatura.bare_extraction(html, url=url, include_comments=False, include_tables=False, as_dict=True)
+        try:
+            raw = trafilatura.bare_extraction(
+                html, url=url, include_comments=False, include_tables=False, as_dict=True
+            )
+        except Exception as exc:
+            raise ExtractionError(f"Extraction failed for {url}: {exc}") from exc
         if raw is None:
             raise ExtractionError(f"No content extracted for {url}")
-        body = str(raw.get("text") or "")  # type: ignore[union-attr]
+        if not isinstance(raw, dict):
+            raise ExtractionError(f"Unexpected extraction result for {url}")
+        body = str(raw.get("text") or "")
         if not body:
             raise ExtractionError(f"Empty body for {url}")
         return body
@@ -290,8 +379,36 @@ class BaseStorage(ABC):
 
 
 class JsonlStorage(BaseStorage):
+    """
+    Append-only JSONL storage with an in-memory URL index so re-runs skip
+    already-scraped articles instead of duplicating them.
+    """
+
     def __init__(self, path: str = OUTPUT_PATH) -> None:
         self._path = path
+        self._seen: set[str] = self._load_seen()
+        if self._seen:
+            log.info("Storage: loaded %d existing URLs from %s", len(self._seen), path)
+
+    def _load_seen(self) -> set[str]:
+        seen: set[str] = set()
+        if not os.path.exists(self._path):
+            return seen
+        try:
+            with open(self._path, encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        url = json.loads(line).get("url")
+                    except json.JSONDecodeError:
+                        continue
+                    if url:
+                        seen.add(url)
+        except OSError as exc:
+            log.warning("Could not read existing storage %s: %s", self._path, exc)
+        return seen
 
     def save(self, article: Article) -> None:
         d = asdict(article)
@@ -300,9 +417,11 @@ class JsonlStorage(BaseStorage):
                 d[key] = d[key].isoformat()
         with open(self._path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(d, ensure_ascii=False) + "\n")
+            fh.flush()
+        self._seen.add(article.url)
 
     def exists(self, url: str) -> bool:
-        return False  # JSONL has no index
+        return url in self._seen
 
 
 # ---------------------------------------------------------------------------
@@ -394,13 +513,34 @@ def parse_rss(feed_html: str) -> list[RSSEntry]:
 # ---------------------------------------------------------------------------
 
 
-def _build_robots(base_url: str) -> urllib.robotparser.RobotFileParser:
+def _build_robots(base_url: str, timeout: tuple[int, int] = REQUEST_TIMEOUT) -> urllib.robotparser.RobotFileParser:
+    """
+    Fetch and parse robots.txt with a timeout.
+
+    Unlike RobotFileParser.read() (which uses urllib with no timeout and, on
+    any failure, leaves the parser in a state where can_fetch() returns False
+    for *every* URL), this:
+      * bounds the fetch with a timeout,
+      * respects explicit Disallow rules on a 200 response,
+      * treats 4xx as "allow all" per RFC 9309,
+      * on 5xx / network error, fails *open* (allow) with a warning so a
+        transient robots problem doesn't silently drop the whole source.
+    """
     rp = urllib.robotparser.RobotFileParser()
-    rp.set_url(urljoin(base_url, "/robots.txt"))
+    robots_url = urljoin(base_url, "/robots.txt")
+    rp.set_url(robots_url)
     try:
-        rp.read()
-    except Exception as exc:
-        log.warning("Could not read robots.txt for %s: %s", base_url, exc)
+        resp = requests.get(robots_url, timeout=timeout, headers={"User-Agent": USER_AGENT})
+        if resp.status_code == 200:
+            rp.parse(resp.text.splitlines())
+        elif 400 <= resp.status_code < 500:
+            rp.parse([])  # RFC 9309: 4xx → unrestricted
+        else:
+            log.warning("robots.txt for %s returned HTTP %d; assuming allow-all", base_url, resp.status_code)
+            rp.parse([])
+    except requests.RequestException as exc:
+        log.warning("Could not read robots.txt for %s (%s); assuming allow-all", base_url, exc)
+        rp.parse([])  # fail open; parse([]) sets last_checked so can_fetch works
     return rp
 
 
@@ -415,6 +555,11 @@ class Scraper:
 
     Inject custom fetcher / extractor / storage to extend behaviour:
         scraper = Scraper(article_fetcher=MyFetcher(), storage=MyStorage())
+
+    Lifecycle: scrape_all() closes fetchers when done. If you call
+    scrape_source() directly, use the Scraper as a context manager
+    (`with Scraper() as s: ...`) or call close() yourself so the browser
+    is released.
     """
 
     def __init__(
@@ -424,6 +569,7 @@ class Scraper:
         extractor: Optional[BaseExtractor] = None,
         storage: Optional[BaseStorage] = None,
         rate_limit: float = RATE_LIMIT_SECONDS,
+        max_entries_per_source: Optional[int] = None,
     ) -> None:
         http = HttpFetcher()
         self._feed_fetcher    = feed_fetcher    or http
@@ -431,14 +577,36 @@ class Scraper:
         self._extractor       = extractor       or TrafilaturaExtractor()
         self._storage         = storage         or JsonlStorage()
         self._rate_limit      = rate_limit
+        self._max_entries     = max_entries_per_source
+
+    # -- context manager ---------------------------------------------------
+
+    def __enter__(self) -> "Scraper":
+        return self
+
+    def __exit__(self, exc_type: object | None, exc: object | None, tb: object | None) -> None:
+        self.close()
+
+    def close(self) -> None:
+        for fetcher in (self._article_fetcher, self._feed_fetcher):
+            try:
+                fetcher.close()
+            except Exception as exc:  # pragma: no cover - best effort
+                log.warning("Error closing fetcher: %s", exc)
+
+    # -- scraping ----------------------------------------------------------
 
     def scrape_source(self, source: SourceConfig) -> ScrapingStats:
         log.info("=== Scraping: %s ===", source.name)
         stats = ScrapingStats()
         robots = _build_robots(source.base_url)
 
+        # Respect Crawl-delay if it's stricter than our own rate limit.
+        crawl_delay = robots.crawl_delay(USER_AGENT)
+        rate = max(self._rate_limit, float(crawl_delay) if crawl_delay else 0.0)
+
         feed_fetcher = (
-            self._feed_fetcher.with_user_agent(BROWSER_UA)  # type: ignore[attr-defined]
+            self._feed_fetcher.with_user_agent(BROWSER_UA)
             if source.rss_browser_ua and isinstance(self._feed_fetcher, HttpFetcher)
             else self._feed_fetcher
         )
@@ -448,17 +616,28 @@ class Scraper:
             log.error("Cannot fetch RSS for %s: %s", source.name, exc)
             return stats
 
-        time.sleep(self._rate_limit)
-        entries = parse_rss(feed_html)
+        time.sleep(rate)
+
+        try:
+            entries = parse_rss(feed_html)
+        except Exception as exc:
+            log.error("Cannot parse RSS for %s: %s", source.name, exc)
+            return stats
+
         if not entries:
             log.warning("No entries for %s", source.name)
             return stats
 
+        if self._max_entries is not None:
+            entries = entries[: self._max_entries]
+
         for entry in entries:
             if not robots.can_fetch(USER_AGENT, entry.url):
                 log.info("robots.txt disallows %s", entry.url)
+                stats.skipped += 1
                 continue
             if self._storage.exists(entry.url):
+                stats.skipped += 1
                 continue
 
             stats.attempted += 1
@@ -467,10 +646,16 @@ class Scraper:
             try:
                 html = self._article_fetcher.fetch(entry.url)
                 body = self._extractor.extract(html, entry.url)
-            except (FetchError, ExtractionError, Exception) as exc:
+            except (FetchError, ExtractionError) as exc:
                 log.warning("Failed (%s): %s", entry.url, exc)
                 stats.failed += 1
-                time.sleep(self._rate_limit)
+                time.sleep(rate)
+                continue
+            except Exception as exc:  # unexpected — log with type, keep going
+                log.warning("Unexpected error (%s): %s: %s",
+                            entry.url, type(exc).__name__, exc)
+                stats.failed += 1
+                time.sleep(rate)
                 continue
 
             article = Article(
@@ -484,53 +669,33 @@ class Scraper:
             )
             self._storage.save(article)
             stats.succeeded += 1
-            log.info("  Saved: %s", article.title[:80])
-            time.sleep(self._rate_limit)
+            log.info("  Saved: %s", (article.title or "")[:80])
+            time.sleep(rate)
 
         return stats
 
     def scrape_all(self, sources: list[SourceConfig]) -> ScrapingStats:
         total = ScrapingStats()
-        for source in sources:
-            s = self.scrape_source(source)
-            total.attempted += s.attempted
-            total.succeeded += s.succeeded
-            total.failed    += s.failed
+        try:
+            for source in sources:
+                try:
+                    s = self.scrape_source(source)
+                except KeyboardInterrupt:
+                    log.warning("Interrupted by user; stopping after %s.", source.name)
+                    break
+                except Exception as exc:
+                    # One bad source must never abort the whole batch.
+                    log.error("Source %s crashed: %s: %s",
+                              source.name, type(exc).__name__, exc)
+                    continue
+                total.attempted += s.attempted
+                total.succeeded += s.succeeded
+                total.failed    += s.failed
+                total.skipped   += s.skipped
+        finally:
+            self.close()
         log.info("Done. %s", total)
         return total
-
-
-# ---------------------------------------------------------------------------
-# Backward-compatible module-level helpers (used by smoke_test.py)
-# ---------------------------------------------------------------------------
-
-
-def fetch_html(url: str, session: Optional[requests.Session] = None) -> str:
-    fetcher = HttpFetcher()
-    if session is not None:
-        fetcher._session = session  # reuse caller's session / headers
-    return fetcher.fetch(url)
-
-
-def requires_js(url: str, session: Optional[requests.Session] = None) -> bool:
-    http = HttpFetcher()
-    if session is not None:
-        http._session = session
-    smart = SmartFetcher(http, PlaywrightFetcher())
-    # Probe: attempt static fetches; returns True only if both fail body threshold
-    try:
-        html = smart._http.fetch(url)
-        if smart._body_length(html, url) >= smart._min_chars:
-            return False
-    except FetchError:
-        pass
-    try:
-        html = smart._http_browser_ua.fetch(url)
-        if smart._body_length(html, url) >= smart._min_chars:
-            return False
-    except FetchError:
-        pass
-    return True
 
 
 # ---------------------------------------------------------------------------
@@ -539,8 +704,29 @@ def requires_js(url: str, session: Optional[requests.Session] = None) -> bool:
 
 
 def main() -> None:
-    Scraper().scrape_all(SOURCES)
+    with Scraper() as scraper:
+        scraper.scrape_all(SOURCES)
 
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# CHANGELOG (robustness hardening)
+# ---------------------------------------------------------------------------
+# 1. JsonlStorage now loads existing URLs on init; exists() works, so re-runs
+#    skip already-scraped articles instead of duplicating the whole file.
+# 2. _build_robots fetches robots.txt with a timeout and fails OPEN with a
+#    warning. Previously a failed/hanging read() made can_fetch() return False
+#    for every URL, silently dropping the entire source.
+# 3. scrape_all wraps each source in try/except: one crashing source no longer
+#    aborts the batch. KeyboardInterrupt stops cleanly.
+# 4. PlaywrightFetcher reuses a single browser process across the whole run
+#    (was launching Chromium per article) and is always closed via close() /
+#    context-manager teardown, even on Ctrl-C.
+# 5. HTTP retries honour Retry-After on 429 (capped at MAX_RETRY_SLEEP); robots
+#    Crawl-delay is respected per source.
+# 6. Extraction/body-length calls are wrapped so a trafilatura crash on one
+#    page degrades gracefully instead of killing the entry.
+# 7. Stats gained a `skipped` counter for visibility into dedup/robots skips.

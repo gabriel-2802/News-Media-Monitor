@@ -31,6 +31,8 @@ public record ArticleDto(
 
     public ArticleDto(Article article) {
         this(article.getAuthor(), article.getTitle(), article.getUrl(),
-                article.getBodyText(), article.getPublishedAt(), article.getTopic().getName(), article.getNewsSource().getName());
+                article.getBodyText(), article.getPublishedAt(),
+                article.getTopic() != null ? article.getTopic().getName() : null,
+                article.getNewsSource().getName());
     }
 }

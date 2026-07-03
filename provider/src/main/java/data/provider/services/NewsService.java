@@ -64,6 +64,13 @@ public class NewsService {
                 .toList();
     }
 
+    public NewsSourceDto getNewsSourceByName(final String sourceName) {
+        final NewsSource source = newsSourceRepository.findByName(sourceName)
+                .orElseThrow(() -> new BusinessException(Constants.SOURCE_DOES_NOT_EXIST_ERROR, sourceName));
+
+        return new NewsSourceDto(source, articleRepository.countArticlesBySource(source.getName()));
+    }
+
     public NewsSourceDto incrementFailureCount(final String sourceName) {
         final NewsSource source = newsSourceRepository.incrementFailureCount(sourceName)
                 .orElseThrow(() -> new BusinessException(Constants.SOURCE_DOES_NOT_EXIST_ERROR, sourceName));

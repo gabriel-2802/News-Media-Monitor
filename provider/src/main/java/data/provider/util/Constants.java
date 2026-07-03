@@ -21,6 +21,7 @@ public final class Constants {
     public static final String ARTICLES_BY_SOURCE_PATH = "/source/{sourceName}";
     public static final String ARTICLES_EXISTS_PATH = "/exists";
     public static final String NEWS_SOURCES_BASE_PATH = "/api/news-sources";
+    public static final String NEWS_SOURCE_BY_NAME_PATH = "/{sourceName}";
     public static final String NEWS_SOURCE_FAILURE_PATH = "/{sourceName}/failure";
     public static final String NEWS_SOURCE_RESET_PATH = "/{sourceName}/reset";
     public static final String ARTICLES_BY_TOPIC_PATH = "/topic/{topicName}";
