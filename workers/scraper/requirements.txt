@@ -1,0 +1,7 @@
+requests
+beautifulsoup4
+lxml
+trafilatura
+python-dateutil
+playwright
+pika
