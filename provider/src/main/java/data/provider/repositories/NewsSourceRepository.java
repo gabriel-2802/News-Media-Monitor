@@ -22,4 +22,12 @@ public interface NewsSourceRepository extends Neo4jRepository<NewsSource, String
             RETURN n
             """)
     Optional<NewsSource> incrementFailureCount(String sourceName);
+
+    @Query("""
+            MATCH (n:NewsSource {name: $sourceName})
+            SET n.failureCount = 0,
+                n.isDisabled = false
+            RETURN n
+            """)
+    Optional<NewsSource> resetFailureCount(String sourceName);
 }

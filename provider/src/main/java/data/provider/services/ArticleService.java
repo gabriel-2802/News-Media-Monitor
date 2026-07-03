@@ -25,12 +25,17 @@ public class ArticleService {
 
     public List<ArticleDto> getAllArticles(final int page, final int count) {
         return articleRepository
-                .findAllWithSource(PageRequest.of(page, count)).getContent().stream().map(ArticleDto::new).toList();
+                .findAllWithSourceAndTopic(PageRequest.of(page, count)).getContent().stream().map(ArticleDto::new).toList();
     }
 
     public List<ArticleDto> getAllArticlesFromSource(final int page, final int count, final String sourceName) {
         return articleRepository
-                .findBySourceName(sourceName, PageRequest.of(page, count)).getContent().stream().map(ArticleDto::new).toList();
+                .findBySourceNameWithTopic(sourceName, PageRequest.of(page, count)).getContent().stream().map(ArticleDto::new).toList();
+    }
+
+    public List<ArticleDto> getAllArticlesWithTopic(final int page, final int count, final String topicName) {
+        return articleRepository
+                .findByTopicNameWithName(topicName, PageRequest.of(page, count)).getContent().stream().map(ArticleDto::new).toList();
     }
 
     public ArticleDto saveArticle(final ArticleRequest articleRequest) {

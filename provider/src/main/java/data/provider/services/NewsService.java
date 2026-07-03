@@ -70,4 +70,11 @@ public class NewsService {
 
         return new NewsSourceDto(source, articleRepository.countArticlesBySource(source.getName()));
     }
+
+    public NewsSourceDto resetFailureCount(final String sourceName) {
+        final NewsSource source = newsSourceRepository.resetFailureCount(sourceName)
+                .orElseThrow(() -> new BusinessException(Constants.SOURCE_DOES_NOT_EXIST_ERROR, sourceName));
+
+        return new NewsSourceDto(source, articleRepository.countArticlesBySource(source.getName()));
+    }
 }

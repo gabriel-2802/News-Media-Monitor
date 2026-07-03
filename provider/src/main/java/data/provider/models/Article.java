@@ -22,4 +22,7 @@ public class Article {
 
     @Relationship(type = "PUBLISHED", direction = Relationship.Direction.INCOMING)
     private NewsSource newsSource;
+
+    @Relationship(type = "HAS_TOPIC", direction = Relationship.Direction.OUTGOING)
+    private Topic topic;
 }

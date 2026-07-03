@@ -23,11 +23,14 @@ public record ArticleDto(
         @Schema(description = "Timestamp the article was published by the source.", example = "2026-07-01T14:30:00")
         LocalDateTime publishedAt,
 
+        @Schema(description = "Name of the topic of this article", example = "politics")
+        String topic,
+
         @Schema(description = "Name of the news source this article was scraped from.", example = "example-news")
         String source) {
 
     public ArticleDto(Article article) {
         this(article.getAuthor(), article.getTitle(), article.getUrl(),
-                article.getBodyText(), article.getPublishedAt(), article.getNewsSource().getName());
+                article.getBodyText(), article.getPublishedAt(), article.getTopic().getName(), article.getNewsSource().getName());
     }
 }
