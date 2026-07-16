@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface TopicRepository extends Neo4jRepository<Topic, String> {
     Optional<Topic> findByName(String name);
+
+    boolean existsByName(String topic);
 }

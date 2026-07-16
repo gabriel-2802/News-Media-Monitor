@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     @Bean
-    public OpenAPI providerOpenAPI() {
+    OpenAPI providerOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
                         .title("News Provider API")
