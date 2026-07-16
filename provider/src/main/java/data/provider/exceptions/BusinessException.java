@@ -18,6 +18,6 @@ public class BusinessException extends RuntimeException {
     private static String format(String template, String... args) {
         return Arrays.stream(args)
                 .reduce(template, (result, arg) ->
-                        result.replaceFirst(BRACKETS, Matcher.quoteReplacement(arg)));
+                        result.replaceFirst(BRACKETS, Matcher.quoteReplacement(String.valueOf(arg))));
     }
 }

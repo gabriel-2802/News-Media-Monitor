@@ -1,6 +1,7 @@
 package data.provider.controllers;
 
 import data.provider.dto.requests.ArticleRequest;
+import data.provider.dto.requests.TopicSetRequest;
 import data.provider.dto.responses.ArticleDto;
 import data.provider.dto.responses.ErrorResponse;
 import data.provider.services.ArticleService;
@@ -94,5 +95,27 @@ public class ArticleController {
             @Parameter(description = "Canonical URL to check.", example = "https://example.com/news/senate-passes-budget", required = true)
             @RequestParam final String url) {
         return ResponseEntity.ok(articleService.existsByURL(url));
+    }
+
+    @GetMapping(Constants.ARTICLES_BY_URL_PATH)
+    @Operation(summary = "Get an article by URL", description = "Returns a single article by its canonical URL.")
+    @ApiResponse(responseCode = "200", description = "Article retrieved successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ArticleDto.class)))
+    @ApiResponse(responseCode = "400", description = "Article does not exist",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<ArticleDto> getArticleByUrl(
+            @Parameter(description = "Canonical URL of the article.", example = "https://example.com/news/senate-passes-budget", required = true)
+            @RequestParam final String url) {
+        return ResponseEntity.ok(articleService.getArticleByUrl(url));
+    }
+
+    @PatchMapping(Constants.ARTICLES_SET_TOPIC_PATH)
+    @Operation(summary = "Set an article's topic", description = "Tags the article at the given URL with a topic, replacing any topic it already had.")
+    @ApiResponse(responseCode = "200", description = "Topic set successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ArticleDto.class)))
+    @ApiResponse(responseCode = "400", description = "Article does not exist",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<ArticleDto> setTopic(@Valid @RequestBody final TopicSetRequest topicSetRequest) {
+        return ResponseEntity.ok(articleService.setTopic(topicSetRequest));
     }
 }

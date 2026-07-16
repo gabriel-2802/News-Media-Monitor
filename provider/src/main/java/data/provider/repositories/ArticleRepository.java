@@ -6,6 +6,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.neo4j.repository.Neo4jRepository;
 import org.springframework.data.neo4j.repository.query.Query;
 
+import java.util.Optional;
+
 public interface ArticleRepository extends Neo4jRepository<Article, String> {
 
     @Query(
@@ -52,6 +54,25 @@ public interface ArticleRepository extends Neo4jRepository<Article, String> {
         """
     )
     Page<Article> findByTopicNameWithName(String topicName, Pageable pageable);
+
+    @Query(
+            value = """
+    MATCH (s:NewsSource)-[:PUBLISHED]->(a:Article {url: $url})
+    OPTIONAL MATCH (a)-[:HAS_TOPIC]->(t:Topic)
+    RETURN a, s, [(s)-[r:PUBLISHED]->(a) | r], t, [(a)-[ht:HAS_TOPIC]->(t) | ht]
+    """
+    )
+    Optional<Article> findByUrlWithSourceAndTopic(String url);
+
+    @Query("""
+        MATCH (s:NewsSource)-[:PUBLISHED]->(a:Article {url: $url})
+        OPTIONAL MATCH (a)-[oldTopic:HAS_TOPIC]->(:Topic)
+        DELETE oldTopic
+        MERGE (t:Topic {name: $topicName})
+        MERGE (a)-[:HAS_TOPIC]->(t)
+        RETURN a, s, [(s)-[r:PUBLISHED]->(a) | r], t, [(a)-[ht:HAS_TOPIC]->(t) | ht]
+        """)
+    Article setTopic(String url, String topicName);
 
 
     @Query("""

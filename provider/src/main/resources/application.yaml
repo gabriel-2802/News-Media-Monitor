@@ -23,6 +23,3 @@ logging:
     data:
       provider:
         util=DEBUG:
-
-default:
-  topic: "world news"

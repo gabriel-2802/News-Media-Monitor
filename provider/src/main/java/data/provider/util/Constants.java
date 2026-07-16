@@ -12,9 +12,13 @@ public final class Constants {
     public static final String NEWS_SOURCE_NAME_EXISTS_ERROR = "News source with name = {} already exists.";
     public static final String NEWS_SOURCE_RSS_URL_EXISTS_ERROR = "News source with RSS URL = {} already exists.";
     public static final String NEWS_SOURCE_URLS_UNREACHABLE_ERROR = "News source URLs are not reachable: baseUrl = {}, rssUrl = {}.";
-    public static final String NEWS_SOURCE_DOMAIN_MISMATCH_LOG = "News source domain mismatch: baseUrl={}, rssUrl={}";
     public static final String NEWS_SOURCE_DOMAIN_MISMATCH_ERROR = "RSS URL domain does not match base URL domain: baseUrl = {}, rssUrl = {}.";
+    public static final String ARTICLE_DOES_NOT_EXIST_ERROR = "Article with the URL = {} does not exist.";
+    public static final String TOPIC_WITH_NAME_DOES_NOT_EXIST_ERROR = "Topic with the name = {} does not exist.";
+
+    // logs
     public static final String NEWS_SOURCE_ADD_SUCCESS_LOG = "News source saved successfully: name={}, id={}";
+    public static final String V1_CLASSIFIER_CREATED_LOG = "ClassificationEngineV1 initialized with API URL: {}";
 
     // paths
     public static final String ARTICLES_BASE_PATH = "/api/articles";
@@ -25,6 +29,9 @@ public final class Constants {
     public static final String NEWS_SOURCE_FAILURE_PATH = "/{sourceName}/failure";
     public static final String NEWS_SOURCE_RESET_PATH = "/{sourceName}/reset";
     public static final String ARTICLES_BY_TOPIC_PATH = "/topic/{topicName}";
+    public static final String ARTICLES_BY_URL_PATH = "/by-url";
+    public static final String ARTICLES_SET_TOPIC_PATH = "/topic";
+
 
 
     // aux

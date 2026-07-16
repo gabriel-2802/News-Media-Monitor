@@ -1,12 +1,15 @@
 package data.provider.services;
 
 import data.provider.dto.requests.ArticleRequest;
+import data.provider.dto.requests.TopicSetRequest;
 import data.provider.dto.responses.ArticleDto;
 import data.provider.exceptions.BusinessException;
 import data.provider.models.Article;
 import data.provider.models.NewsSource;
+import data.provider.models.Topic;
 import data.provider.repositories.ArticleRepository;
 import data.provider.repositories.NewsSourceRepository;
+import data.provider.repositories.TopicRepository;
 import data.provider.util.Constants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +25,7 @@ public class ArticleService {
 
     private final ArticleRepository articleRepository;
     private final NewsSourceRepository newsSourceRepository;
+    private final TopicRepository topicRepository;
 
     public List<ArticleDto> getAllArticles(final int page, final int count) {
         return articleRepository
@@ -60,6 +64,26 @@ public class ArticleService {
                 .build();
 
         articleRepository.save(article);
+        return new ArticleDto(article);
+    }
+
+    public ArticleDto getArticleByUrl(final String url) {
+        final Article article = articleRepository.findByUrlWithSourceAndTopic(url)
+                .orElseThrow(() -> new BusinessException(Constants.ARTICLE_DOES_NOT_EXIST_ERROR, url));
+        return new ArticleDto(article);
+    }
+
+    public ArticleDto setTopic(final TopicSetRequest topicSetRequest) {
+        if (!articleRepository.existsByUrl(topicSetRequest.articleUrl())) {
+            throw new BusinessException(Constants.ARTICLE_DOES_NOT_EXIST_ERROR, topicSetRequest.articleUrl());
+        }
+
+        if (!topicRepository.existsByName(topicSetRequest.topic())) {
+            throw new BusinessException(Constants.TOPIC_WITH_NAME_DOES_NOT_EXIST_ERROR, topicSetRequest.topic());
+        }
+
+        final Article article = articleRepository.setTopic(topicSetRequest.articleUrl(), topicSetRequest.topic());
+
         return new ArticleDto(article);
     }
 
