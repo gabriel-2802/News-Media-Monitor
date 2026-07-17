@@ -2,11 +2,23 @@
 embedder.py — singleton embedding model, same pattern as NewsClassifier.
 """
 from __future__ import annotations
+import sys
+from pathlib import Path
 from typing import Optional
 from sentence_transformers import SentenceTransformer
 import torch
 
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"  # see data/output/validation_report.md — 27x smaller than Qwen3-Embedding-0.6B for a 90.8%->88.0% balanced-accuracy tradeoff
+# Allows `from env_config import ...` to resolve both when run as part of
+# the `clusterer` package (cwd=workers/, already on sys.path) and when
+# imported standalone by clusterer/data/validate.py (which only puts
+# workers/clusterer/ on sys.path).
+_WORKERS_DIR = Path(__file__).resolve().parent.parent
+if str(_WORKERS_DIR) not in sys.path:
+    sys.path.insert(0, str(_WORKERS_DIR))
+
+from env_config import require_env  # noqa: E402
+
+MODEL_NAME = require_env("EMBEDDING_MODEL_NAME")  # see data/output/validation_report.md — 27x smaller than Qwen3-Embedding-0.6B for a 90.8%->88.0% balanced-accuracy tradeoff
 
 
 class ArticleEmbedder:

@@ -40,7 +40,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -62,25 +61,27 @@ from scraper.news_scraper import (
     USER_AGENT,
     parse_rss,
 )
+from env_config import require_env, require_int
 from provider_client import ProviderClient, ProviderError, SourceInfo
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://admin:secret@localhost:5672/news_monitor")
-PROVIDER_URL = os.getenv("PROVIDER_URL", "http://localhost:8080")
+RABBITMQ_URL = require_env("RABBITMQ_URL")
+PROVIDER_URL = require_env("PROVIDER_URL")
 
-SCRAPE_JOBS_QUEUE       = "scrape.jobs"
-CLUSTERING_QUEUE        = "clustering"
-NEWS_EXCHANGE           = "news_monitor"
-SCRAPE_JOB_ROUTING_KEY  = "scrape.job"
-CLUSTERING_ROUTING_KEY  = "article.clustering"
+SCRAPE_JOBS_QUEUE       = require_env("SCRAPE_JOBS_QUEUE")
+NEWS_EXCHANGE           = require_env("NEWS_EXCHANGE")
+SCRAPE_JOB_ROUTING_KEY  = require_env("SCRAPE_JOB_ROUTING_KEY")
+CLUSTERING_ROUTING_KEY  = require_env("CLUSTERING_ROUTING_KEY")
 
 # Matches the Provider's own auto-disable threshold (see NewsSourceRepository.incrementFailureCount).
-MAX_ATTEMPTS = 3
+MAX_ATTEMPTS = require_int("SCRAPE_MAX_ATTEMPTS")
 
-RSS_BROWSER_UA_SOURCES: frozenset[str] = frozenset({"cbc"})
+RSS_BROWSER_UA_SOURCES: frozenset[str] = frozenset(
+    name.strip() for name in require_env("RSS_BROWSER_UA_SOURCES").split(",") if name.strip()
+)
 
 logging.basicConfig(
     level=logging.INFO,

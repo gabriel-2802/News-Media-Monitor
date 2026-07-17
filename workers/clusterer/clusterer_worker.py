@@ -47,7 +47,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -66,34 +65,35 @@ from qdrant_client.models import (
 )
 
 from clusterer.embedder import ArticleEmbedder
+from env_config import require_env, require_float, require_int
 from provider_client import ProviderClient, ProviderError
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://admin:secret@localhost:5672/news_monitor")
-PROVIDER_URL = os.getenv("PROVIDER_URL", "http://localhost:8080")
+RABBITMQ_URL = require_env("RABBITMQ_URL")
+PROVIDER_URL = require_env("PROVIDER_URL")
 
-EMBEDDING_QUEUE = "embedding"
-CENTROID_COLLECTION = "story_centroids"
+EMBEDDING_QUEUE = require_env("EMBEDDING_QUEUE")
+CENTROID_COLLECTION = require_env("CENTROID_COLLECTION")
 
 # Must match ArticleEmbedder's output dim (all-MiniLM-L6-v2 = 384). Update
 # alongside embedder.py's MODEL_NAME if that ever changes — a mismatch
 # fails loudly at collection-creation time, not silently.
-EMBEDDING_DIM = 384
+EMBEDDING_DIM = require_int("EMBEDDING_DIM")
 
 # Chosen from workers/clusterer/data/output/validation_report.md (the
 # all-MiniLM-L6-v2 run, since that's what embedder.py uses). Revisit once
 # real traffic accumulates.
-SIMILARITY_THRESHOLD = 0.533
-RECENCY_WINDOW_DAYS = 5
+SIMILARITY_THRESHOLD = require_float("SIMILARITY_THRESHOLD")
+RECENCY_WINDOW_DAYS = require_int("RECENCY_WINDOW_DAYS")
 
 # The model has no automatic truncation for inputs this short of its
 # max_seq_length, so an unusually long scraped article can drive quadratic
 # self-attention memory into the tens-of-GB range. Cap before embedding —
 # see validate.py, where this was found live.
-_MAX_EMBED_CHARS = 4000
+_MAX_EMBED_CHARS = require_int("MAX_EMBED_CHARS")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -101,13 +101,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger(__name__)
-
-
-def _required_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"Missing required environment variable: {name}")
-    return value
 
 
 def _embed_article(embedder: ArticleEmbedder, title: str, body_text: str) -> list[float]:
@@ -268,8 +261,8 @@ class Worker:
     ) -> None:
         self._rabbitmq_url = rabbitmq_url
         self._provider_url = provider_url
-        self._qdrant_url = qdrant_url or _required_env("QDRANT_URL")
-        self._qdrant_api_key = qdrant_api_key or _required_env("QDRANT_API_KEY")
+        self._qdrant_url = qdrant_url or require_env("QDRANT_URL")
+        self._qdrant_api_key = qdrant_api_key or require_env("QDRANT_API_KEY")
 
     def run(self) -> None:
         provider = ProviderClient(self._provider_url)

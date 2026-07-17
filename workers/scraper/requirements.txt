@@ -5,3 +5,4 @@ trafilatura
 python-dateutil
 playwright
 pika
+python-dotenv
