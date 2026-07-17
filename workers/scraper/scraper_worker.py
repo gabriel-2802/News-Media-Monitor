@@ -46,6 +46,7 @@ from typing import Any
 
 import pika
 import pika.channel
+import pika.exceptions
 import pika.spec
 
 from scraper.news_scraper import (
@@ -62,6 +63,7 @@ from scraper.news_scraper import (
     parse_rss,
 )
 from env_config import require_env, require_int
+from log_config import configure_logging
 from provider_client import ProviderClient, ProviderError, SourceInfo
 
 # ---------------------------------------------------------------------------
@@ -83,11 +85,7 @@ RSS_BROWSER_UA_SOURCES: frozenset[str] = frozenset(
     name.strip() for name in require_env("RSS_BROWSER_UA_SOURCES").split(",") if name.strip()
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)-8s %(message)s",
-    datefmt="%H:%M:%S",
-)
+configure_logging()
 log = logging.getLogger(__name__)
 
 
@@ -256,6 +254,19 @@ class Worker:
 
         handler = JobHandler(channel, provider)
 
+        def _safe_nack(ch: pika.channel.Channel, delivery_tag: int) -> None:
+            """Best-effort nack. If the connection itself is already gone
+            (e.g. a dropped TCP stream), there's nothing more to do here —
+            RabbitMQ will redeliver once it notices the consumer vanished,
+            and start_consuming()'s caller handles the resulting disconnect.
+            Letting that secondary failure escape uncaught is what used to
+            crash the whole worker with an unrelated ChannelWrongStateError
+            on top of the original connection loss."""
+            try:
+                ch.basic_nack(delivery_tag=delivery_tag, requeue=True)
+            except pika.exceptions.AMQPError as exc:
+                log.error("Could not nack message — connection already lost: %s", exc)
+
         def _callback(
             ch: pika.channel.Channel,
             method: pika.spec.Basic.Deliver,
@@ -266,10 +277,10 @@ class Worker:
                 handler.handle(method, body)
             except ProviderError as exc:
                 log.error("Provider unreachable — nacking for requeue: %s", exc)
-                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+                _safe_nack(ch, method.delivery_tag)
             except Exception as exc:
                 log.exception("Unhandled crash processing message — nacking for requeue: %s", exc)
-                ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+                _safe_nack(ch, method.delivery_tag)
 
         channel.basic_consume(queue=SCRAPE_JOBS_QUEUE, on_message_callback=_callback)
         log.info("Listening on '%s'. Ctrl-C to stop.", SCRAPE_JOBS_QUEUE)
@@ -279,8 +290,13 @@ class Worker:
         except KeyboardInterrupt:
             log.info("Shutting down…")
             channel.stop_consuming()
+        except pika.exceptions.AMQPError as exc:
+            log.error("Lost connection to RabbitMQ — exiting: %s", exc)
         finally:
-            connection.close()
+            try:
+                connection.close()
+            except pika.exceptions.AMQPError as exc:
+                log.debug("Connection already closed: %s", exc)
 
 
 if __name__ == "__main__":
