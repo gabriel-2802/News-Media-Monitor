@@ -1,5 +1,6 @@
 package data.provider.models;
 
+import data.provider.util.UuidStringIdGenerator;
 import lombok.Builder;
 import lombok.Data;
 import org.springframework.data.neo4j.core.schema.*;
@@ -9,7 +10,7 @@ import org.springframework.data.neo4j.core.schema.*;
 @Builder
 public class NewsSource {
     @Id
-    @GeneratedValue
+    @GeneratedValue(UuidStringIdGenerator.class)
     private String id;
 
     private String name;

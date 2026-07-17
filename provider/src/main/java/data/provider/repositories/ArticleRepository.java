@@ -87,5 +87,20 @@ public interface ArticleRepository extends Neo4jRepository<Article, String> {
         """)
     long countByTopic(String topicName);
 
+    @Query(
+            value = """
+            MATCH (s:NewsSource)-[:PUBLISHED]->(a:Article)-[:BELONGS_TO]->(story:Story {id: $storyId})
+            OPTIONAL MATCH (a)-[:HAS_TOPIC]->(t:Topic)
+            RETURN a, s, [(s)-[r:PUBLISHED]->(a) | r], t, [(a)-[ht:HAS_TOPIC]->(t) | ht]
+            ORDER BY a.publishedAt DESC
+            SKIP $skip LIMIT $limit
+            """,
+            countQuery = """
+            MATCH (:Article)-[:BELONGS_TO]->(:Story {id: $storyId})
+            RETURN count(*)
+            """
+    )
+    Page<Article> findByStoryId(String storyId, Pageable pageable);
+
     boolean existsByUrl(String url);
 }
