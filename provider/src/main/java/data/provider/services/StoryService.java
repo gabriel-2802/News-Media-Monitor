@@ -73,4 +73,15 @@ public class StoryService {
         return articleRepository.findByStoryId(storyId, PageRequest.of(0, MAX_ARTICLES_PER_STORY))
                 .getContent().stream().map(ArticleDto::new).toList();
     }
+
+    public StoryDto getStoryForArticle(final String articleUrl) {
+        if (!articleRepository.existsByUrl(articleUrl)) {
+            throw new BusinessException(Constants.ARTICLE_DOES_NOT_EXIST_ERROR, articleUrl);
+        }
+
+        final Story story = storyRepository.findByArticleUrl(articleUrl)
+                .orElseThrow(() -> new BusinessException(Constants.ARTICLE_NOT_IN_STORY_ERROR, articleUrl));
+
+        return new StoryDto(story, getArticlesForStory(story.getId()));
+    }
 }

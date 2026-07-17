@@ -37,9 +37,11 @@ public final class Constants {
     public static final String STORIES_BASE_PATH = "/api/stories";
     public static final String STORIES_ATTACH_PATH = "/{storyId}/attach";
     public static final String STORIES_RECENT_PATH = "/recent";
+    public static final String STORIES_BY_ARTICLE_PATH = "/by-article";
 
     // story errors
     public static final String STORY_DOES_NOT_EXIST_ERROR = "Story with id = {} does not exist.";
+    public static final String ARTICLE_NOT_IN_STORY_ERROR = "Article with URL = {} is not attached to any story.";
 
     // aux
     public static final String DEFAULT_PAGE = "0";

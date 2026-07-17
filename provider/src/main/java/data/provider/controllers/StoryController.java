@@ -68,6 +68,18 @@ public class StoryController {
         return ResponseEntity.status(HttpStatus.CREATED).body(storyService.createStory(title));
     }
 
+    @GetMapping(Constants.STORIES_BY_ARTICLE_PATH)
+    @Operation(summary = "Get the story an article belongs to", description = "Returns the story cluster that the article at the given URL is attached to.")
+    @ApiResponse(responseCode = "200", description = "Story retrieved successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = StoryDto.class)))
+    @ApiResponse(responseCode = "400", description = "Article does not exist, or is not attached to any story",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<StoryDto> getStoryForArticle(
+            @Parameter(description = "Canonical URL of the article.", example = "https://example.com/news/senate-passes-budget", required = true)
+            @RequestParam final String url) {
+        return ResponseEntity.ok(storyService.getStoryForArticle(url));
+    }
+
     @PatchMapping(Constants.STORIES_ATTACH_PATH)
     @Operation(summary = "Attach an article to a story", description = "Creates a BELONGS_TO edge from the article to the story. "
             + "Increments articleCount unconditionally and sourceCount only if the article's source has not previously contributed to this story. "

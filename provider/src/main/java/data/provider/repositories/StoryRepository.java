@@ -45,4 +45,10 @@ public interface StoryRepository extends Neo4jRepository<Story, String> {
             RETURN story
             """)
     Optional<Story> attachArticle(String storyId, String articleUrl, Instant now);
+
+    @Query("""
+            MATCH (:Article {url: $articleUrl})-[:BELONGS_TO]->(story:Story)
+            RETURN story
+            """)
+    Optional<Story> findByArticleUrl(String articleUrl);
 }
