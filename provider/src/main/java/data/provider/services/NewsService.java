@@ -36,20 +36,16 @@ public class NewsService {
             throw new BusinessException(Constants.NEWS_SOURCE_RSS_URL_EXISTS_ERROR, newsSourceRequest.rssUrl());
         }
 
-        if (!newsSourceRequest.rssUrl().contains(Util.extractDomain(newsSourceRequest.baseUrl()))) {
-            throw new BusinessException(Constants.NEWS_SOURCE_DOMAIN_MISMATCH_ERROR,
-                    newsSourceRequest.baseUrl(), newsSourceRequest.rssUrl());
-        }
-
-        if (Util.isNotReachable(newsSourceRequest.rssUrl()) || Util.isNotReachable(newsSourceRequest.baseUrl())) {
-            throw new BusinessException(Constants.NEWS_SOURCE_URLS_UNREACHABLE_ERROR,
-                    newsSourceRequest.baseUrl(), newsSourceRequest.rssUrl());
-        }
+        validateReachability(newsSourceRequest);
 
         final NewsSource source = NewsSource.builder()
                 .baseUrl(newsSourceRequest.baseUrl())
                 .name(newsSourceRequest.name())
                 .rssUrl(newsSourceRequest.rssUrl())
+                .notes(newsSourceRequest.notes())
+                .politicalView(newsSourceRequest.politicalView())
+                .sources(newsSourceRequest.sources())
+                .biasScores(newsSourceRequest.biasScores())
                 .build();
 
         newsSourceRepository.save(source);
@@ -71,6 +67,39 @@ public class NewsService {
         return new NewsSourceDto(source, articleRepository.countArticlesBySource(source.getName()));
     }
 
+    public NewsSourceDto updateNewsSource(final String sourceName, final NewsSourceRequest newsSourceRequest) {
+        final NewsSource existingSource = newsSourceRepository.findByName(sourceName)
+                .orElseThrow(() -> new BusinessException(Constants.SOURCE_DOES_NOT_EXIST_ERROR, sourceName));
+
+        if (!existingSource.getBaseUrl().equals(newsSourceRequest.baseUrl()) && newsSourceRepository.existsByBaseUrl(newsSourceRequest.baseUrl())) {
+            throw new BusinessException(Constants.NEWS_SOURCE_BASE_URL_EXISTS_ERROR, newsSourceRequest.baseUrl());
+        }
+
+        if (!existingSource.getRssUrl().equals(newsSourceRequest.rssUrl()) && newsSourceRepository.existsByRssUrl(newsSourceRequest.rssUrl())) {
+            throw new BusinessException(Constants.NEWS_SOURCE_RSS_URL_EXISTS_ERROR, newsSourceRequest.rssUrl());
+        }
+
+        validateReachability(newsSourceRequest);
+
+        final NewsSource updatedSource = NewsSource.builder()
+                .id(existingSource.getId())
+                .name(newsSourceRequest.name())
+                .baseUrl(newsSourceRequest.baseUrl())
+                .rssUrl(newsSourceRequest.rssUrl())
+                .notes(newsSourceRequest.notes())
+                .politicalView(newsSourceRequest.politicalView())
+                .sources(newsSourceRequest.sources())
+                .biasScores(newsSourceRequest.biasScores())
+                .failureCount(existingSource.getFailureCount())
+                .isDisabled(existingSource.getIsDisabled())
+                .build();
+
+        newsSourceRepository.save(updatedSource);
+        log.info(Constants.NEWS_SOURCE_UPDATE_SUCCESS_LOG, updatedSource.getName(), updatedSource.getId());
+
+        return new NewsSourceDto(updatedSource, articleRepository.countArticlesBySource(updatedSource.getName()));
+    }
+
     public NewsSourceDto incrementFailureCount(final String sourceName) {
         final NewsSource source = newsSourceRepository.incrementFailureCount(sourceName)
                 .orElseThrow(() -> new BusinessException(Constants.SOURCE_DOES_NOT_EXIST_ERROR, sourceName));
@@ -83,5 +112,12 @@ public class NewsService {
                 .orElseThrow(() -> new BusinessException(Constants.SOURCE_DOES_NOT_EXIST_ERROR, sourceName));
 
         return new NewsSourceDto(source, articleRepository.countArticlesBySource(source.getName()));
+    }
+
+    private void validateReachability(final NewsSourceRequest newsSourceRequest) {
+        if (Util.isNotReachable(newsSourceRequest.rssUrl()) || Util.isNotReachable(newsSourceRequest.baseUrl())) {
+            throw new BusinessException(Constants.NEWS_SOURCE_URLS_UNREACHABLE_ERROR,
+                    newsSourceRequest.baseUrl(), newsSourceRequest.rssUrl());
+        }
     }
 }
