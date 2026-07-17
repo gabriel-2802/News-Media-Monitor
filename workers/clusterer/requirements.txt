@@ -1,0 +1,9 @@
+sentence-transformers
+torch
+numpy
+requests
+trafilatura
+beautifulsoup4
+tqdm
+pika
+qdrant-client
