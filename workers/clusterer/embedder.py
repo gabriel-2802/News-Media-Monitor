@@ -47,5 +47,8 @@ class ArticleEmbedder:
         # normalize_embeddings=True → vectors are unit length, so cosine
         # similarity reduces to a dot product (cheaper, and what Qdrant's
         # cosine distance metric expects).
-        vec = self.model.encode(text, normalize_embeddings=True)
+        # show_progress_bar=False -- this is always a single string (a
+        # batch of one), so the per-call tqdm bar is pure log noise in a
+        # hot path, not a meaningful progress indicator.
+        vec = self.model.encode(text, normalize_embeddings=True, show_progress_bar=False)
         return vec.tolist()

@@ -12,8 +12,9 @@ Robustness notes (see CHANGELOG at bottom):
   * robots.txt is fetched with a timeout and fails *open* with a warning,
     rather than silently disallowing an entire source.
   * One failing source never aborts the whole batch.
-  * Playwright reuses a single browser process across the whole run and is
-    always closed, even on Ctrl-C.
+  * Playwright runs in a fresh subprocess per fetch (see PlaywrightFetcher)
+    rather than a reused in-process browser — required so its sync API
+    never shares a process with pika's asyncio-based transport.
   * HTTP retries honour Retry-After (429) and robots Crawl-delay is respected.
 """
 from __future__ import annotations
@@ -21,11 +22,14 @@ from __future__ import annotations
 import json
 import logging
 import os
+import subprocess
+import sys
 import time
 import urllib.robotparser
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urljoin
 
@@ -34,9 +38,9 @@ import trafilatura
 from bs4 import BeautifulSoup
 from dateutil import parser as dateutil_parser
 from dateutil.tz import tzoffset
-from playwright.sync_api import Browser, Playwright, sync_playwright
 
 from env_config import require_env, require_float, require_int
+from log_config import configure_logging
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -53,11 +57,7 @@ JS_LOAD_WAIT_MS = require_int("JS_LOAD_WAIT_MS")
 JS_MIN_CHARS = require_int("JS_MIN_CHARS")
 OUTPUT_PATH = require_env("SCRAPER_OUTPUT_PATH")
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
-    datefmt="%H:%M:%S",
-)
+configure_logging()
 log = logging.getLogger(__name__)
 
 
@@ -143,6 +143,11 @@ class ExtractionError(Exception):
     pass
 
 
+class _BrowserCrashed(Exception):
+    """Internal — the Playwright subprocess was killed by a signal (e.g. a
+    Chromium segfault), not a controlled failure. Usually transient."""
+
+
 # ---------------------------------------------------------------------------
 # Fetchers
 # ---------------------------------------------------------------------------
@@ -223,60 +228,97 @@ class PlaywrightFetcher(BaseFetcher):
     """
     Headless browser fetcher for JS-heavy pages.
 
-    The Playwright driver and Chromium process are started lazily and reused
-    across every fetch, then torn down via close(). Each fetch gets a fresh,
-    isolated browser context (own cookies) so pages don't leak state, but we
-    do NOT pay the cost of launching a browser per article.
+    Each fetch runs Playwright in a fresh, short-lived subprocess
+    (playwright_fetch_worker.py) rather than in-process. Modern pika wraps
+    its "blocking" connection around an asyncio-based transport internally,
+    so this worker process already has an asyncio event loop alive by the
+    time a message callback runs; Playwright's sync API spins up its own
+    background thread with its own asyncio loop, and two independent
+    asyncio setups sharing a process is a known-fragile combination — it
+    was observed to break Playwright's internal dispatcher after the
+    RabbitMQ consumer loop had been running a while, and an in-process
+    restart of the browser/driver did not recover it. A subprocess
+    guarantees no shared asyncio/threading state at all, at the cost of a
+    fresh browser launch per JS-rendered fetch — acceptable since fetches
+    are already rate-limited between articles.
     """
+
+    # Native crashes (segfaults etc.) in a fresh Chromium launch are usually
+    # transient flakiness, not a persistent problem with the URL — worth one
+    # retry before giving up on the article.
+    _MAX_CRASH_RETRIES = 1
 
     def __init__(
         self,
         user_agent: str = BROWSER_UA,
         load_wait_ms: int = JS_LOAD_WAIT_MS,
         timeout_ms: float = REQUEST_TIMEOUT[1] * 1000,
+        subprocess_timeout_s: float = 60.0,
+        max_crash_retries: int = _MAX_CRASH_RETRIES,
     ) -> None:
         self._user_agent = user_agent
         self._load_wait_ms = load_wait_ms
         self._timeout_ms = timeout_ms
-        self._pw: Optional[Playwright] = None
-        self._browser: Optional[Browser] = None
-
-    def _ensure_browser(self) -> None:
-        if self._pw is None:
-            self._pw = sync_playwright().start()
-        assert self._pw is not None
-        if self._browser is None or not self._browser.is_connected():
-            self._browser = self._pw.chromium.launch(headless=True, args=["--disable-http2"])
+        self._subprocess_timeout_s = subprocess_timeout_s
+        self._max_crash_retries = max_crash_retries
+        self._workers_dir = Path(__file__).resolve().parent.parent
 
     def fetch(self, url: str) -> str:
-        try:
-            self._ensure_browser()
-            assert self._browser is not None
-            context = self._browser.new_context(user_agent=self._user_agent)
+        attempt = 0
+        while True:
             try:
-                page = context.new_page()
-                page.goto(url, timeout=self._timeout_ms, wait_until="domcontentloaded")
-                page.wait_for_timeout(self._load_wait_ms)
-                return str(page.content())
-            finally:
-                context.close()
-        except Exception as exc:
-            raise FetchError(f"Browser fetch failed for {url}: {exc}") from exc
+                return self._fetch_once(url)
+            except _BrowserCrashed as exc:
+                if attempt >= self._max_crash_retries:
+                    raise FetchError(
+                        f"Browser fetch failed for {url}: {exc} (after {attempt + 1} attempt(s))"
+                    ) from exc
+                attempt += 1
+                log.warning(
+                    "Browser crashed fetching %s (%s) — retrying (attempt %d/%d)",
+                    url, exc, attempt + 1, self._max_crash_retries + 1,
+                )
+
+    def _fetch_once(self, url: str) -> str:
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable, "-m", "scraper.playwright_fetch_worker",
+                    url, self._user_agent, str(self._load_wait_ms), str(self._timeout_ms),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=self._subprocess_timeout_s,
+                cwd=self._workers_dir,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise FetchError(f"Browser fetch timed out for {url}: {exc}") from exc
+
+        if result.returncode < 0:
+            # Negative returncode = killed by signal (e.g. -11 = SIGSEGV) —
+            # a native crash, not a controlled failure. Let fetch() retry it.
+            raise _BrowserCrashed(f"killed by signal {-result.returncode}")
+
+        if result.returncode != 0:
+            error = self._extract_error(result.stdout) or result.stderr.strip() or f"exit code {result.returncode}"
+            raise FetchError(f"Browser fetch failed for {url}: {error}")
+
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise FetchError(f"Browser fetch produced invalid output for {url}: {exc}") from exc
+
+        return str(payload["html"])
+
+    @staticmethod
+    def _extract_error(stdout: str) -> Optional[str]:
+        try:
+            return json.loads(stdout).get("error")
+        except (json.JSONDecodeError, AttributeError):
+            return None
 
     def close(self) -> None:
-        try:
-            if self._browser is not None:
-                self._browser.close()
-        except Exception as exc:  # pragma: no cover - best-effort teardown
-            log.warning("Error closing browser: %s", exc)
-        finally:
-            self._browser = None
-            if self._pw is not None:
-                try:
-                    self._pw.stop()
-                except Exception as exc:  # pragma: no cover
-                    log.warning("Error stopping Playwright: %s", exc)
-                self._pw = None
+        """No persistent process to tear down — each fetch is its own subprocess."""
 
 
 class SmartFetcher(BaseFetcher):
