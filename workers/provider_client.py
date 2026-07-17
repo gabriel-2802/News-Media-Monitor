@@ -15,11 +15,10 @@ from typing import TYPE_CHECKING, Any, Optional
 import requests
 
 if TYPE_CHECKING:
-    from scraper.news_scraper import Article
+    from workers.scraper.news_scraper import Article
 
 log = logging.getLogger(__name__)
 
-# Endpoints
 # Endpoints
 _SOURCE_PATH = "/api/news-sources/{name}"
 _SOURCE_FAILURE_PATH = "/api/news-sources/{name}/failure"
@@ -28,8 +27,20 @@ _ARTICLES_PATH = "/api/articles"
 _ARTICLE_EXISTS_PATH = "/api/articles/exists"
 _ARTICLE_BY_URL_PATH = "/api/articles/by-url"
 _ARTICLE_TOPIC_PATH = "/api/articles/topic"
+_ARTICLES_BY_STORY_PATH = "/api/articles/story/{storyId}"
+_STORIES_PATH = "/api/stories"
+_STORIES_RECENT_PATH = "/api/stories/recent"
+_STORY_ATTACH_PATH = "/api/stories/{storyId}/attach"
 
 _NOT_FOUND_OR_REJECTED = HTTPStatus.BAD_REQUEST
+
+
+def _parse_instant(value: str) -> datetime:
+    """Parse a java.time.Instant serialized by Jackson (ISO-8601 UTC, 'Z'
+    suffix) — Python's fromisoformat doesn't accept 'Z' before 3.11."""
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
+    return datetime.fromisoformat(value)
 
 
 class ProviderError(Exception):
@@ -72,6 +83,29 @@ class ArticleInfo:
             body_text=row["bodyText"],
             published_at=datetime.fromisoformat(row["publishedAt"]).replace(tzinfo=timezone.utc),
             source=row["source"],
+        )
+
+
+@dataclass(frozen=True)
+class StoryInfo:
+    id: str
+    title: str
+    created_at: datetime
+    last_updated: datetime
+    article_count: int
+    source_count: int
+    trending_score: float
+
+    @classmethod
+    def from_dict(cls, row: dict[str, Any]) -> "StoryInfo":
+        return cls(
+            id=row["id"],
+            title=row["title"],
+            created_at=_parse_instant(row["createdAt"]),
+            last_updated=_parse_instant(row["lastUpdated"]),
+            article_count=row["articleCount"],
+            source_count=row["sourceCount"],
+            trending_score=row["trendingScore"],
         )
 
 
@@ -127,8 +161,47 @@ class ProviderClient:
 
     def set_article_topic(self, url: str, topic: str) -> ArticleInfo:
         """Tag the article at the given URL with a topic, replacing any topic it already had."""
-        resp = self._request("PATCH", _ARTICLE_TOPIC_PATH, json={"articleUrl": url, "topic": topic})
+        resp = self._request("PATCH", _ARTICLE_TOPIC_PATH, json={"url": url, "topic": topic})
         return ArticleInfo.from_dict(self._json_or_raise(resp))
+
+    def get_articles_by_story(self, story_id: str, page: int = 0, count: int = 20) -> list[ArticleInfo]:
+        """Articles belonging to a story, most-recently-published first.
+
+        There's no vector DB yet, so the clustering worker uses this to
+        pull a story's representative article(s) and re-embed them on the
+        fly instead of comparing against a stored centroid.
+        """
+        resp = self._request(
+            "GET", _ARTICLES_BY_STORY_PATH.format(storyId=story_id), params={"page": page, "count": count}
+        )
+        return [ArticleInfo.from_dict(row) for row in self._json_or_raise(resp)]
+
+    def create_story(self, title: str) -> StoryInfo:
+        """POST a new story cluster, seeded with a title (usually the first article's)."""
+        resp = self._request("POST", _STORIES_PATH, params={"title": title})
+        if resp.status_code != HTTPStatus.CREATED:
+            raise ProviderError(f"POST {_STORIES_PATH}: unexpected status {resp.status_code}: {resp.text}")
+        return StoryInfo.from_dict(resp.json())
+
+    def attach_article_to_story(self, story_id: str, article_url: str) -> Optional[StoryInfo]:
+        """Attach an article to a story. Returns None if the provider rejects it
+        (story or article doesn't exist -- reported as HTTP 400)."""
+        resp = self._request(
+            "PATCH", _STORY_ATTACH_PATH.format(storyId=story_id), json={"articleUrl": article_url}
+        )
+        if resp.status_code == _NOT_FOUND_OR_REJECTED:
+            return None
+        return StoryInfo.from_dict(self._json_or_raise(resp))
+
+    def get_recent_stories(self, days: int = 7) -> list[StoryInfo]:
+        """Stories with activity in the last `days` days -- the clustering
+        worker's candidate pool for attach-vs-create decisions."""
+        resp = self._request("GET", _STORIES_RECENT_PATH, params={"days": days})
+        return [StoryInfo.from_dict(row) for row in self._json_or_raise(resp)]
+
+    def get_stories(self, page: int = 0, count: int = 20) -> list[StoryInfo]:
+        resp = self._request("GET", _STORIES_PATH, params={"page": page, "count": count})
+        return [StoryInfo.from_dict(row) for row in self._json_or_raise(resp)]
 
     @staticmethod
     def _article_payload(article: "Article") -> dict[str, Any]:
