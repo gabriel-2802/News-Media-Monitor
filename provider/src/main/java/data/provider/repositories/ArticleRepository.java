@@ -1,6 +1,7 @@
 package data.provider.repositories;
 
 import data.provider.models.Article;
+import data.provider.util.Constants;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.neo4j.repository.Neo4jRepository;
@@ -103,4 +104,22 @@ public interface ArticleRepository extends Neo4jRepository<Article, String> {
     Page<Article> findByStoryId(String storyId, Pageable pageable);
 
     boolean existsByUrl(String url);
+
+    @Query(
+            value = """
+                    CALL db.index.fulltext.queryNodes('""" + Constants.ARTICLE_SEARCH_FULLTEXT_IDX + """
+                    ', $query) YIELD node AS a, score
+                    MATCH (s:NewsSource)-[:PUBLISHED]->(a)
+                    OPTIONAL MATCH (a)-[:HAS_TOPIC]->(t:Topic)
+                    RETURN a, s, [(s)-[r:PUBLISHED]->(a) | r], t, [(a)-[ht:HAS_TOPIC]->(t) | ht]
+                    ORDER BY score DESC
+                    SKIP $skip LIMIT $limit
+                    """,
+            countQuery = """
+                    CALL db.index.fulltext.queryNodes('""" + Constants.ARTICLE_SEARCH_FULLTEXT_IDX + """
+                    ', $query) YIELD node
+                    RETURN count(node)
+                    """
+    )
+    Page<Article> searchByTitleOrBody(String query, Pageable pageable);
 }

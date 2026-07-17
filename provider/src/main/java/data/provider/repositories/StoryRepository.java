@@ -1,6 +1,7 @@
 package data.provider.repositories;
 
 import data.provider.models.Story;
+import data.provider.util.Constants;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.neo4j.repository.Neo4jRepository;
@@ -51,4 +52,20 @@ public interface StoryRepository extends Neo4jRepository<Story, String> {
             RETURN story
             """)
     Optional<Story> findByArticleUrl(String articleUrl);
+
+    @Query(
+            value = """
+                    CALL db.index.fulltext.queryNodes('""" + Constants.STORY_TITLE_FULLTEXT_IDX + """
+                    ', $query) YIELD node AS story, score
+                    RETURN story
+                    ORDER BY score DESC
+                    SKIP $skip LIMIT $limit
+                    """,
+            countQuery = """
+                    CALL db.index.fulltext.queryNodes('""" + Constants.STORY_TITLE_FULLTEXT_IDX + """
+                    ', $query) YIELD node
+                    RETURN count(node)
+                    """
+    )
+    Page<Story> searchByTitle(String query, Pageable pageable);
 }

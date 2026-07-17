@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -132,5 +133,21 @@ public class ArticleController {
             content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
     public ResponseEntity<ArticleDto> setTopic(@Valid @RequestBody final TopicSetRequest topicSetRequest) {
         return ResponseEntity.ok(articleService.setTopic(topicSetRequest));
+    }
+
+    @GetMapping(Constants.ARTICLES_SEARCH_PATH)
+    @Operation(summary = "Search articles by title or body", description = "Full-text search over article titles and body text, ordered by "
+            + "relevance. Matching is prefix-based per term (e.g. \"sen bud\" matches text containing words starting with sen and bud).")
+    @ApiResponse(responseCode = "200", description = "Matching articles retrieved successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    array = @io.swagger.v3.oas.annotations.media.ArraySchema(schema = @Schema(implementation = ArticleDto.class))))
+    public ResponseEntity<List<ArticleDto>> searchArticles(
+            @Parameter(description = "Free-text search query.", example = "senate budget", required = true)
+            @RequestParam @NotBlank final String q,
+            @Parameter(description = "Zero-based page index.", example = "0")
+            @RequestParam(defaultValue = Constants.DEFAULT_PAGE) final int page,
+            @Parameter(description = "Number of articles per page.", example = "20")
+            @RequestParam(defaultValue = Constants.DEFAULT_COUNT) final int count) {
+        return ResponseEntity.ok(articleService.searchArticles(q, page, count));
     }
 }
