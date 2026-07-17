@@ -104,7 +104,7 @@ neo4j-wait: ## Block until Neo4j accepts connections
 .PHONY: migrate
 migrate: neo4j-wait ## Apply all pending Neo4j migrations
 	@echo "Running migrations..."
-	$(COMPOSE) exec -T neo4j bash /migrations/migrate.sh
+	$(COMPOSE) exec -T -e NEO4J_PASSWORD=$(NEO4J_PASSWORD) neo4j bash /migrate.sh
 
 .PHONY: migrate-info
 migrate-info: ## List applied migrations stored in Neo4j

@@ -13,6 +13,7 @@ services:
       - neo4j_logs:/logs
       - neo4j_plugins:/plugins
       - ./neo4j/migrations:/migrations:ro
+      - ./neo4j/migrate.sh:/migrate.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#neo4j/}\" 'RETURN 1' 2>/dev/null || exit 1"]
       interval: 20s
