@@ -31,7 +31,7 @@ classify-worker:
 	$(CLASSIFIER_VENV)/bin/python -m classifier.classifier_worker
 
 cluster-worker:
-	set -a && . ../.env && set +a && $(CLUSTERER_VENV)/bin/python -m clusterer.clusterer_worker
+	$(CLUSTERER_VENV)/bin/python -m clusterer.clusterer_worker
 
 clean:
 	rm -rf $(SCRAPER_VENV) $(CLASSIFIER_VENV) $(CLUSTERER_VENV) __pycache__ scraper/__pycache__ classifier/__pycache__ clusterer/__pycache__

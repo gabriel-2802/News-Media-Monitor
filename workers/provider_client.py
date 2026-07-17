@@ -14,10 +14,14 @@ from typing import TYPE_CHECKING, Any, Optional
 
 import requests
 
+from env_config import require_float
+
 if TYPE_CHECKING:
     from workers.scraper.news_scraper import Article
 
 log = logging.getLogger(__name__)
+
+_DEFAULT_TIMEOUT = require_float("PROVIDER_TIMEOUT_SECONDS")
 
 # Endpoints
 _SOURCE_PATH = "/api/news-sources/{name}"
@@ -110,7 +114,7 @@ class StoryInfo:
 
 
 class ProviderClient:
-    def __init__(self, base_url: str, timeout: float = 10.0) -> None:
+    def __init__(self, base_url: str, timeout: float = _DEFAULT_TIMEOUT) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._session = requests.Session()

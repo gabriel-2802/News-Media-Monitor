@@ -35,23 +35,23 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 
 import pika
 import pika.channel
 import pika.spec
 
 from classifier.classifier import NewsClassifier
+from env_config import require_env
 from provider_client import ProviderClient, ProviderError
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://admin:secret@localhost:5672/news_monitor")
-PROVIDER_URL = os.getenv("PROVIDER_URL", "http://localhost:8080")
+RABBITMQ_URL = require_env("RABBITMQ_URL")
+PROVIDER_URL = require_env("PROVIDER_URL")
 
-CLUSTERING_QUEUE = "clustering"
+CLUSTERING_QUEUE = require_env("CLUSTERING_QUEUE")
 
 logging.basicConfig(
     level=logging.INFO,

@@ -36,23 +36,22 @@ from dateutil import parser as dateutil_parser
 from dateutil.tz import tzoffset
 from playwright.sync_api import Browser, Playwright, sync_playwright
 
+from env_config import require_env, require_float, require_int
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-USER_AGENT = "NewsMonitorBot/0.1 (research scraper; contact: gabrielvalentine738@gmail.com)"
-BROWSER_UA = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-)
-REQUEST_TIMEOUT: tuple[int, int] = (5, 10)
-RATE_LIMIT_SECONDS = 2.0
-MAX_RETRIES = 3
-RETRY_BACKOFF = 3.0
-MAX_RETRY_SLEEP = 60.0          # cap so a hostile Retry-After can't stall the run
-JS_LOAD_WAIT_MS = 3000
-JS_MIN_CHARS = 200
-OUTPUT_PATH = "articles.jsonl"
+USER_AGENT = require_env("USER_AGENT")
+BROWSER_UA = require_env("BROWSER_USER_AGENT")
+REQUEST_TIMEOUT: tuple[int, int] = (require_int("REQUEST_TIMEOUT_CONNECT"), require_int("REQUEST_TIMEOUT_READ"))
+RATE_LIMIT_SECONDS = require_float("RATE_LIMIT_SECONDS")
+MAX_RETRIES = require_int("MAX_RETRIES")
+RETRY_BACKOFF = require_float("RETRY_BACKOFF")
+MAX_RETRY_SLEEP = require_float("MAX_RETRY_SLEEP")          # cap so a hostile Retry-After can't stall the run
+JS_LOAD_WAIT_MS = require_int("JS_LOAD_WAIT_MS")
+JS_MIN_CHARS = require_int("JS_MIN_CHARS")
+OUTPUT_PATH = require_env("SCRAPER_OUTPUT_PATH")
 
 logging.basicConfig(
     level=logging.INFO,
