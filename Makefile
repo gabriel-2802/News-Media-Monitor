@@ -118,6 +118,18 @@ migrate-clean: ## Delete all migration tracking nodes — dev only, DESTRUCTIVE
 	$(COMPOSE) exec neo4j cypher-shell -u neo4j -p $(NEO4J_PASSWORD) \
 	  "MATCH (m:\`__Migration\`) DELETE m;"
 
+.PHONY: _neo4j-purge-exec
+_neo4j-purge-exec:
+	$(COMPOSE) exec neo4j cypher-shell -u neo4j -p $(NEO4J_PASSWORD) \
+	  "MATCH (n) DETACH DELETE n;"
+
+.PHONY: neo4j-purge
+neo4j-purge: ## Delete ALL data in Neo4j — nodes, relationships, migration history — DESTRUCTIVE
+	@echo "⚠️  WARNING: this deletes ALL data in Neo4j (articles, sources, stories, topics, migration history)."
+	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
+	@$(MAKE) _neo4j-purge-exec
+	@echo "✓ Neo4j purged. Run 'make migrate' to reapply schema constraints if needed."
+
 # ── RabbitMQ ───────────────────────────────────────────────────────────────────
 
 .PHONY: rabbitmq-setup
@@ -156,3 +168,35 @@ rabbitmq-purge-scrape-jobs: ## Purge the scrape.jobs queue — DESTRUCTIVE
 	@echo "⚠️  WARNING: all queued messages in scrape.jobs will be discarded."
 	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
 	$(COMPOSE) exec rabbitmq rabbitmqctl purge_queue scrape.jobs -p $(RABBITMQ_VHOST)
+
+# ── Qdrant ─────────────────────────────────────────────────────────────────────
+# Qdrant is not a docker-compose service (it's Qdrant Cloud) — QDRANT_URL and
+# QDRANT_API_KEY come from .env, not from Makefile variables.
+
+.PHONY: _qdrant-purge-exec
+_qdrant-purge-exec:
+	@set -a && . .env && set +a && \
+	collection=$${CENTROID_COLLECTION:-story_centroids}; \
+	status=$$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE \
+	  "$$QDRANT_URL/collections/$$collection" -H "api-key: $$QDRANT_API_KEY"); \
+	if [ "$$status" = "200" ]; then \
+	  echo "✓ Qdrant collection '$$collection' purged."; \
+	else \
+	  echo "✗ Qdrant purge failed (HTTP $$status)"; exit 1; \
+	fi
+
+.PHONY: qdrant-purge
+qdrant-purge: ## Delete the story_centroids Qdrant collection (recreated automatically on next cluster-worker start) — DESTRUCTIVE
+	@echo "⚠️  WARNING: this deletes all story centroid vectors in Qdrant."
+	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
+	@$(MAKE) _qdrant-purge-exec
+
+# ── Combined cleanup ───────────────────────────────────────────────────────────
+
+.PHONY: purge-dbs
+purge-dbs: ## Wipe ALL data in both Neo4j and Qdrant — DESTRUCTIVE
+	@echo "⚠️  WARNING: this deletes ALL data in Neo4j AND Qdrant. This cannot be undone."
+	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
+	@$(MAKE) _neo4j-purge-exec
+	@$(MAKE) _qdrant-purge-exec
+	@echo "✓ Both databases purged. Run 'make migrate' to reapply Neo4j schema constraints if needed."
