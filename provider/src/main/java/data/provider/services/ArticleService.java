@@ -74,17 +74,22 @@ public class ArticleService {
     }
 
     public ArticleDto setTopic(final TopicSetRequest topicSetRequest) {
-        if (!articleRepository.existsByUrl(topicSetRequest.articleUrl())) {
-            throw new BusinessException(Constants.ARTICLE_DOES_NOT_EXIST_ERROR, topicSetRequest.articleUrl());
+        if (!articleRepository.existsByUrl(topicSetRequest.url())) {
+            throw new BusinessException(Constants.ARTICLE_DOES_NOT_EXIST_ERROR, topicSetRequest.url());
         }
 
         if (!topicRepository.existsByName(topicSetRequest.topic())) {
             throw new BusinessException(Constants.TOPIC_WITH_NAME_DOES_NOT_EXIST_ERROR, topicSetRequest.topic());
         }
 
-        final Article article = articleRepository.setTopic(topicSetRequest.articleUrl(), topicSetRequest.topic());
+        final Article article = articleRepository.setTopic(topicSetRequest.url(), topicSetRequest.topic());
 
         return new ArticleDto(article);
+    }
+
+    public List<ArticleDto> getArticlesByStory(final int page, final int count, final String storyId) {
+        return articleRepository
+                .findByStoryId(storyId, PageRequest.of(page, count)).getContent().stream().map(ArticleDto::new).toList();
     }
 
     public boolean existsByURL(final String url) {

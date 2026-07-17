@@ -31,8 +31,15 @@ public final class Constants {
     public static final String ARTICLES_BY_TOPIC_PATH = "/topic/{topicName}";
     public static final String ARTICLES_BY_URL_PATH = "/by-url";
     public static final String ARTICLES_SET_TOPIC_PATH = "/topic";
+    public static final String ARTICLES_BY_STORY_PATH = "/story/{storyId}";
 
+    // story paths
+    public static final String STORIES_BASE_PATH = "/api/stories";
+    public static final String STORIES_ATTACH_PATH = "/{storyId}/attach";
+    public static final String STORIES_RECENT_PATH = "/recent";
 
+    // story errors
+    public static final String STORY_DOES_NOT_EXIST_ERROR = "Story with id = {} does not exist.";
 
     // aux
     public static final String DEFAULT_PAGE = "0";

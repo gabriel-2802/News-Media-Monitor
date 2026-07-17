@@ -59,6 +59,21 @@ public class ArticleController {
         return ResponseEntity.ok(articleService.getAllArticlesFromSource(page, count, sourceName));
     }
 
+    @GetMapping(Constants.ARTICLES_BY_STORY_PATH)
+    @Operation(summary = "List articles in a story", description = "Returns a paginated list of all articles that belong to the given story cluster.")
+    @ApiResponse(responseCode = "200", description = "Articles retrieved successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    array = @io.swagger.v3.oas.annotations.media.ArraySchema(schema = @Schema(implementation = ArticleDto.class))))
+    public ResponseEntity<List<ArticleDto>> getAllArticlesInStory(
+            @Parameter(description = "ID of the story cluster.", required = true)
+            @PathVariable final String storyId,
+            @Parameter(description = "Zero-based page index.", example = "0")
+            @RequestParam(defaultValue = Constants.DEFAULT_PAGE) final int page,
+            @Parameter(description = "Number of articles per page.", example = "20")
+            @RequestParam(defaultValue = Constants.DEFAULT_COUNT) final int count) {
+        return ResponseEntity.ok(articleService.getArticlesByStory(page, count, storyId));
+    }
+
     @GetMapping(Constants.ARTICLES_BY_TOPIC_PATH)
     @Operation(summary = "List articles by topic", description = "Returns a paginated list of articles tagged with the given topic.")
     @ApiResponse(responseCode = "200", description = "Articles retrieved successfully",
