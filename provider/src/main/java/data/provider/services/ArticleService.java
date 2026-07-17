@@ -50,7 +50,7 @@ public class ArticleService {
         final NewsSource source = newsSourceRepository.findByName(articleRequest.sourceName())
                 .orElseThrow(() -> new BusinessException(Constants.SOURCE_DOES_NOT_EXIST_ERROR, articleRequest.sourceName()));
 
-        if (!articleRequest.url().contains(source.getBaseUrl())) {
+        if (!stripScheme(articleRequest.url()).contains(stripScheme(source.getBaseUrl()))) {
             throw new BusinessException(Constants.NEWS_SOURCE_ARTICLE_URL_MISMATCH_ERROR, articleRequest.url(), articleRequest.sourceName());
         }
 
@@ -94,5 +94,14 @@ public class ArticleService {
 
     public boolean existsByURL(final String url) {
         return articleRepository.existsByUrl(url);
+    }
+
+    /**
+     * RSS feeds sometimes serve http:// article links for an https-only
+     * site (or vice versa) — the scheme carries no identity information for
+     * "does this URL belong to this source", so strip it before comparing.
+     */
+    private static String stripScheme(final String url) {
+        return url.replaceFirst("^https?://", "");
     }
 }

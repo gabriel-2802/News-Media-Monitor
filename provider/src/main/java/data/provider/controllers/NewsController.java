@@ -69,6 +69,21 @@ public class NewsController {
         return ResponseEntity.status(HttpStatus.CREATED).body(savedSource);
     }
 
+    @PutMapping(Constants.NEWS_SOURCE_BY_NAME_PATH)
+    @Operation(summary = "Update a news source", description = "Replaces the news source's data with the desired final state described in the "
+            + "request body. Fails if the new name, base URL, or RSS URL already belongs to a different source, or if either URL is unreachable.")
+    @ApiResponse(responseCode = "200", description = "News source updated successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = NewsSourceDto.class)))
+    @ApiResponse(responseCode = "400", description = "Validation failed, the source does not exist, the new name/baseUrl/rssUrl already belongs "
+            + "to a different source, or the source's URLs are unreachable",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ErrorResponse.class)))
+    public ResponseEntity<NewsSourceDto> updateNewsSource(
+            @Parameter(description = "Name of the news source.", example = "example-news", required = true)
+            @PathVariable final String sourceName,
+            @Valid @RequestBody final NewsSourceRequest newsSourceRequest) {
+        return ResponseEntity.ok(newsService.updateNewsSource(sourceName, newsSourceRequest));
+    }
+
     @PatchMapping(Constants.NEWS_SOURCE_FAILURE_PATH)
     @Operation(summary = "Increment a source's failure count", description = "Increments the consecutive scrape-failure counter for the given source. "
             + "Used by the scraper to track sources that repeatedly fail to be reached.")

@@ -3,6 +3,9 @@ package data.provider.dto.responses;
 import data.provider.models.NewsSource;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.util.List;
+import java.util.Map;
+
 @Schema(description = "A registered news source and its current stats.")
 public record NewsSourceDto(
 
@@ -22,10 +25,32 @@ public record NewsSourceDto(
         boolean disabled,
 
         @Schema(description = "Total number of articles ingested from this source.", example = "42")
-        Long articleCount) {
+        Long articleCount,
+
+        @Schema(description = "Free-text notes about this source.")
+                String notes,
+
+        @Schema(description = "Political leaning/bias classification of this source.",
+                example = "center-left")
+        String politicalView,
+
+        @Schema(description = "Reference sources/citations backing the bias classification.")
+        List<String> sources,
+
+        @Schema(description = "Bias scores keyed by rating provider or methodology.",
+                example = "{\"AllSides\": \"Lean Left\"}")
+        Map<String, String> biasScores) {
 
     public NewsSourceDto(NewsSource newsSource, long articleCount) {
-        this(newsSource.getName(), newsSource.getBaseUrl(), newsSource.getRssUrl(),
-                newsSource.getFailureCount(), newsSource.getIsDisabled(), articleCount);
+        this(newsSource.getName(),
+                newsSource.getBaseUrl(),
+                newsSource.getRssUrl(),
+                newsSource.getFailureCount(),
+                newsSource.getIsDisabled(),
+                articleCount,
+                newsSource.getNotes(),
+                newsSource.getPoliticalView(),
+                newsSource.getSources(),
+                newsSource.getBiasScores());
     }
 }

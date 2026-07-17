@@ -18,6 +18,7 @@ public final class Constants {
 
     // logs
     public static final String NEWS_SOURCE_ADD_SUCCESS_LOG = "News source saved successfully: name={}, id={}";
+    public static final String NEWS_SOURCE_UPDATE_SUCCESS_LOG = "News source updated successfully: name={}, id={}";
     public static final String V1_CLASSIFIER_CREATED_LOG = "ClassificationEngineV1 initialized with API URL: {}";
 
     // paths
