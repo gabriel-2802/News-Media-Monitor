@@ -44,6 +44,14 @@ public final class Constants {
     public static final String STORY_DOES_NOT_EXIST_ERROR = "Story with id = {} does not exist.";
     public static final String ARTICLE_NOT_IN_STORY_ERROR = "Article with URL = {} is not attached to any story.";
 
+    // search paths
+    public static final String STORIES_SEARCH_PATH = "/search";
+    public static final String ARTICLES_SEARCH_PATH = "/search";
+
+    // fulltext index names
+    public static final String STORY_TITLE_FULLTEXT_IDX = "story_title_fulltext_idx";
+    public static final String ARTICLE_SEARCH_FULLTEXT_IDX = "article_search_fulltext_idx";
+
     // aux
     public static final String DEFAULT_PAGE = "0";
     public static final String DEFAULT_COUNT = "20";

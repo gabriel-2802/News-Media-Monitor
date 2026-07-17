@@ -94,4 +94,20 @@ public class StoryController {
             @Valid @RequestBody final AttachArticleRequest request) {
         return ResponseEntity.ok(storyService.attachArticle(storyId, request));
     }
+
+    @GetMapping(Constants.STORIES_SEARCH_PATH)
+    @Operation(summary = "Search stories by title", description = "Full-text search over story titles, ordered by relevance. Matching is "
+            + "prefix-based per term (e.g. \"sen bud\" matches titles containing words starting with sen and bud).")
+    @ApiResponse(responseCode = "200", description = "Matching stories retrieved successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    array = @ArraySchema(schema = @Schema(implementation = StoryDto.class))))
+    public ResponseEntity<List<StoryDto>> searchStories(
+            @Parameter(description = "Free-text search query.", example = "senate budget", required = true)
+            @RequestParam @NotBlank final String q,
+            @Parameter(description = "Zero-based page index.", example = "0")
+            @RequestParam(defaultValue = Constants.DEFAULT_PAGE) final int page,
+            @Parameter(description = "Number of stories per page.", example = "20")
+            @RequestParam(defaultValue = Constants.DEFAULT_COUNT) final int count) {
+        return ResponseEntity.ok(storyService.searchStories(q, page, count));
+    }
 }

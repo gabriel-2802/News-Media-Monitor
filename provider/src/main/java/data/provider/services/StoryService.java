@@ -8,6 +8,7 @@ import data.provider.models.Story;
 import data.provider.repositories.ArticleRepository;
 import data.provider.repositories.StoryRepository;
 import data.provider.util.Constants;
+import data.provider.util.FullTextSearchUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -83,5 +84,11 @@ public class StoryService {
                 .orElseThrow(() -> new BusinessException(Constants.ARTICLE_NOT_IN_STORY_ERROR, articleUrl));
 
         return new StoryDto(story, getArticlesForStory(story.getId()));
+    }
+
+    public List<StoryDto> searchStories(final String query, final int page, final int count) {
+        final String fulltextQuery = FullTextSearchUtil.toPrefixQuery(query);
+        return storyRepository.searchByTitle(fulltextQuery, PageRequest.of(page, count))
+                .getContent().stream().map(StoryDto::new).toList();
     }
 }

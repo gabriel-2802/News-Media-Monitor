@@ -11,6 +11,7 @@ import data.provider.repositories.ArticleRepository;
 import data.provider.repositories.NewsSourceRepository;
 import data.provider.repositories.TopicRepository;
 import data.provider.util.Constants;
+import data.provider.util.FullTextSearchUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -94,6 +95,12 @@ public class ArticleService {
 
     public boolean existsByURL(final String url) {
         return articleRepository.existsByUrl(url);
+    }
+
+    public List<ArticleDto> searchArticles(final String query, final int page, final int count) {
+        final String fulltextQuery = FullTextSearchUtil.toPrefixQuery(query);
+        return articleRepository.searchByTitleOrBody(fulltextQuery, PageRequest.of(page, count))
+                .getContent().stream().map(ArticleDto::new).toList();
     }
 
     /**
