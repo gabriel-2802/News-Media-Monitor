@@ -1,5 +1,6 @@
 package data.provider.services;
 
+import data.provider.dto.messages.ScrapeJobMessage;
 import data.provider.dto.requests.ArticleRequest;
 import data.provider.dto.requests.TopicSetRequest;
 import data.provider.dto.responses.ArticleDto;
@@ -14,6 +15,8 @@ import data.provider.util.Constants;
 import data.provider.util.FullTextSearchUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +30,10 @@ public class ArticleService {
     private final ArticleRepository articleRepository;
     private final NewsSourceRepository newsSourceRepository;
     private final TopicRepository topicRepository;
+    private final RabbitTemplate rabbitTemplate;
+
+    @Value("${rabbitmq.scrape-jobs-queue}")
+    private String scrapeJobsQueue;
 
     public List<ArticleDto> getAllArticles(final int page, final int count) {
         return articleRepository
@@ -95,6 +102,14 @@ public class ArticleService {
 
     public boolean existsByURL(final String url) {
         return articleRepository.existsByUrl(url);
+    }
+
+    public int triggerScrape() {
+        final List<NewsSource> sources = newsSourceRepository.findAll();
+        sources.forEach(source -> rabbitTemplate.convertAndSend(scrapeJobsQueue, new ScrapeJobMessage(source.getName())));
+
+        log.info(Constants.SCRAPE_TRIGGERED_LOG, sources.size());
+        return sources.size();
     }
 
     public List<ArticleDto> searchArticles(final String query, final int page, final int count) {

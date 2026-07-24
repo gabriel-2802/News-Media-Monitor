@@ -95,6 +95,16 @@ public class StoryController {
         return ResponseEntity.ok(storyService.attachArticle(storyId, request));
     }
 
+    @GetMapping(Constants.STORIES_EXISTS_PATH)
+    @Operation(summary = "Check story existence", description = "Returns whether a story with the given ID exists.")
+    @ApiResponse(responseCode = "200", description = "Existence check result",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = Boolean.class)))
+    public ResponseEntity<Boolean> existsById(
+            @Parameter(description = "ID of the story to check.", required = true)
+            @RequestParam final String storyId) {
+        return ResponseEntity.ok(storyService.existsById(storyId));
+    }
+
     @GetMapping(Constants.STORIES_SEARCH_PATH)
     @Operation(summary = "Search stories by title", description = "Full-text search over story titles, ordered by relevance. Matching is "
             + "prefix-based per term (e.g. \"sen bud\" matches titles containing words starting with sen and bud).")

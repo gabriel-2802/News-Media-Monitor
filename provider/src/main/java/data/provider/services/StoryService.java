@@ -86,6 +86,10 @@ public class StoryService {
         return new StoryDto(story, getArticlesForStory(story.getId()));
     }
 
+    public boolean existsById(final String storyId) {
+        return storyRepository.existsById(storyId);
+    }
+
     public List<StoryDto> searchStories(final String query, final int page, final int count) {
         final String fulltextQuery = FullTextSearchUtil.toPrefixQuery(query);
         return storyRepository.searchByTitle(fulltextQuery, PageRequest.of(page, count))
