@@ -13,8 +13,10 @@ disabled flag) from the Provider, scrapes it, and:
     until an operator (or a lucky attempt here) resets it.
   - If the source is enabled, a failed attempt increments its failure count
     via the Provider and the job is re-queued, up to MAX_ATTEMPTS total.
-  - Every article saved through the Provider has its URL published to the
-    `clustering` queue for the downstream clustering worker.
+  - Every article saved through the Provider has its URL published (fanned
+    out via the `article.saved` routing key) to both the `article.classify`
+    and `article.cluster` queues, for the downstream classifier and
+    clustering workers respectively.
 
 Scrape job message format (JSON):
     {
@@ -22,7 +24,7 @@ Scrape job message format (JSON):
         "retry_count": 0          # optional, defaults to 0
     }
 
-Clustering message format (JSON):
+Article-saved message format (JSON):
     {
         "url": "...",
         "source_name": "bbc"
@@ -73,10 +75,10 @@ from provider_client import ProviderClient, ProviderError, SourceInfo
 RABBITMQ_URL = require_env("RABBITMQ_URL")
 PROVIDER_URL = require_env("PROVIDER_URL")
 
-SCRAPE_JOBS_QUEUE       = require_env("SCRAPE_JOBS_QUEUE")
-NEWS_EXCHANGE           = require_env("NEWS_EXCHANGE")
-SCRAPE_JOB_ROUTING_KEY  = require_env("SCRAPE_JOB_ROUTING_KEY")
-CLUSTERING_ROUTING_KEY  = require_env("CLUSTERING_ROUTING_KEY")
+SCRAPE_JOBS_QUEUE        = require_env("SCRAPE_JOBS_QUEUE")
+NEWS_EXCHANGE            = require_env("NEWS_EXCHANGE")
+SCRAPE_JOB_ROUTING_KEY   = require_env("SCRAPE_JOB_ROUTING_KEY")
+ARTICLE_SAVED_ROUTING_KEY = require_env("ARTICLE_SAVED_ROUTING_KEY")
 
 # Matches the Provider's own auto-disable threshold (see NewsSourceRepository.incrementFailureCount).
 MAX_ATTEMPTS = require_int("SCRAPE_MAX_ATTEMPTS")
@@ -213,7 +215,7 @@ class JobHandler:
                 time.sleep(self._rate_limit)
                 continue
 
-            self._publish(CLUSTERING_ROUTING_KEY, {"url": article.url, "source_name": article.source})
+            self._publish(ARTICLE_SAVED_ROUTING_KEY, {"url": article.url, "source_name": article.source})
             saved += 1
             log.info("[%s] Saved + queued for clustering: %s", source.name, article.title[:80])
             time.sleep(self._rate_limit)

@@ -4,8 +4,9 @@ RabbitMQ-driven classification worker.
 Neo4j is never touched directly — every read/write of article data goes
 through the Provider service's REST API, same as the scrape worker.
 
-Consumes messages from the `clustering` queue (published by the scrape
-worker after each article is saved). For each message:
+Consumes messages from the `article.classify` queue (published by the scrape
+worker after each article is saved — see scraper_worker.py). For each
+message:
 
   - Fetches the article's body text from the Provider.
   - Classifies it into a topic using the fine-tuned NewsClassifier model.
@@ -17,11 +18,10 @@ Message format (JSON), published by worker.py:
         "source_name": "bbc"
     }
 
-This queue is also where the *next* stage (embedding + clustering) will
-eventually consume from. For now this worker only classifies topic; it does
-not touch Story/embedding logic — see the architecture plan for how that
-gets layered in later as a second consumer of the same queue, or a
-follow-on queue if classification should gate clustering.
+This worker only classifies topic; it does not touch Story/embedding logic.
+Clustering runs as an independent consumer of the same scrape-worker
+fan-out, off its own `article.cluster` queue (see clusterer_worker.py and
+rabbitmq/setup.sh).
 
 Run (from workers/, the parent of this file):
     make classify-worker
@@ -53,7 +53,7 @@ from provider_client import ProviderClient, ProviderError
 RABBITMQ_URL = require_env("RABBITMQ_URL")
 PROVIDER_URL = require_env("PROVIDER_URL")
 
-CLUSTERING_QUEUE = require_env("CLUSTERING_QUEUE")
+ARTICLE_CLASSIFY_QUEUE = require_env("ARTICLE_CLASSIFY_QUEUE")
 
 configure_logging()
 log = logging.getLogger(__name__)
@@ -155,8 +155,8 @@ class Worker:
                 log.exception("Unhandled crash processing message — nacking for requeue: %s", exc)
                 _safe_nack(ch, method.delivery_tag)
 
-        channel.basic_consume(queue=CLUSTERING_QUEUE, on_message_callback=_callback)
-        log.info("Listening on '%s'. Ctrl-C to stop.", CLUSTERING_QUEUE)
+        channel.basic_consume(queue=ARTICLE_CLASSIFY_QUEUE, on_message_callback=_callback)
+        log.info("Listening on '%s'. Ctrl-C to stop.", ARTICLE_CLASSIFY_QUEUE)
 
         try:
             channel.start_consuming()

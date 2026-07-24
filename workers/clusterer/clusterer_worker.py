@@ -6,11 +6,12 @@ goes through the Provider service's REST API, same as the scrape and
 classifier workers. Embeddings live in Qdrant (`story_centroids`
 collection), keyed by Story ID, never in Neo4j.
 
-Consumes messages from the `embedding` queue. This queue is bound to the
-same `article.clustering` routing key the scrape worker already publishes
-to after every article save (see scraper_worker.py) — it runs as an
-independent second consumer alongside the classifier worker rather than
-competing with it for the same messages (see rabbitmq/setup.sh).
+Consumes messages from the `article.cluster` queue. This queue is bound to
+the same `article.saved` routing key the scrape worker publishes to after
+every article save (see scraper_worker.py) — it runs as an independent
+consumer alongside the classifier worker (which consumes `article.classify`
+off the same fan-out) rather than competing with it for the same messages
+(see rabbitmq/setup.sh).
 
 For each message:
   - Fetches the article's body text from the Provider.
@@ -77,7 +78,7 @@ from provider_client import ProviderClient, ProviderError
 RABBITMQ_URL = require_env("RABBITMQ_URL")
 PROVIDER_URL = require_env("PROVIDER_URL")
 
-EMBEDDING_QUEUE = require_env("EMBEDDING_QUEUE")
+ARTICLE_CLUSTER_QUEUE = require_env("ARTICLE_CLUSTER_QUEUE")
 CENTROID_COLLECTION = require_env("CENTROID_COLLECTION")
 
 # Must match ArticleEmbedder's output dim (all-MiniLM-L6-v2 = 384). Update
@@ -306,8 +307,8 @@ class Worker:
                 log.exception("Unhandled crash processing message — nacking for requeue: %s", exc)
                 _safe_nack(ch, method.delivery_tag)
 
-        channel.basic_consume(queue=EMBEDDING_QUEUE, on_message_callback=_callback)
-        log.info("Listening on '%s'. Ctrl-C to stop.", EMBEDDING_QUEUE)
+        channel.basic_consume(queue=ARTICLE_CLUSTER_QUEUE, on_message_callback=_callback)
+        log.info("Listening on '%s'. Ctrl-C to stop.", ARTICLE_CLUSTER_QUEUE)
 
         try:
             channel.start_consuming()
