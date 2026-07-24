@@ -7,7 +7,7 @@ Architecture:
   BaseStorage  → JsonlStorage
   Scraper      → orchestrates one source end-to-end
 
-Robustness notes (see CHANGELOG at bottom):
+Robustness notes:
   * Storage deduplicates across runs (loads existing URLs on init).
   * robots.txt is fetched with a timeout and fails *open* with a warning,
     rather than silently disallowing an entire source.
@@ -745,14 +745,8 @@ class Scraper:
 
 
 def main() -> None:
-    # with Scraper(max_entries_per_source=1) as scraper:
-    #     scraper.scrape_all(SOURCES)
-
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
-        b = p.chromium.launch(headless=True, args=["--disable-http2"])
-        print(b.version)
-        b.close()
+    with Scraper() as scraper:
+        scraper.scrape_all(SOURCES)
 
 
 if __name__ == "__main__":
