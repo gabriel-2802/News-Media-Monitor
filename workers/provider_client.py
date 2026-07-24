@@ -3,6 +3,12 @@ HTTP client for the Provider service.
 
 Neo4j is not accessed directly by the scraper: the Provider service is the
 only path to source and article data.
+
+The Provider requires a Bearer token (ROLE_SYSTEM) on every mutating
+endpoint it exposes to workers (see provider/RABBIT.md's sibling doc,
+provider/API.md, for the auth matrix). That token is issued by the manager
+service's system login, not by the Provider itself — this client logs in
+once at construction and transparently re-logs-in if the token expires.
 """
 from __future__ import annotations
 
@@ -14,7 +20,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 import requests
 
-from env_config import require_float
+from env_config import require_env, require_float
 
 if TYPE_CHECKING:
     from workers.scraper.news_scraper import Article
@@ -22,6 +28,8 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = require_float("PROVIDER_TIMEOUT_SECONDS")
+_MANAGER_URL = require_env("MANAGER_URL")
+_SYSTEM_CODE = require_env("SYSTEM_CODE")
 
 # Endpoints
 _SOURCE_PATH = "/api/news-sources/{name}"
@@ -35,6 +43,8 @@ _ARTICLES_BY_STORY_PATH = "/api/articles/story/{storyId}"
 _STORIES_PATH = "/api/stories"
 _STORIES_RECENT_PATH = "/api/stories/recent"
 _STORY_ATTACH_PATH = "/api/stories/{storyId}/attach"
+
+_MANAGER_LOGIN_PATH = "/api/auth/login"
 
 _NOT_FOUND_OR_REJECTED = HTTPStatus.BAD_REQUEST
 
@@ -115,10 +125,40 @@ class StoryInfo:
 
 
 class ProviderClient:
-    def __init__(self, base_url: str, timeout: float = _DEFAULT_TIMEOUT) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        timeout: float = _DEFAULT_TIMEOUT,
+        manager_url: str = _MANAGER_URL,
+        system_code: str = _SYSTEM_CODE,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
+        self._manager_url = manager_url.rstrip("/")
+        self._system_code = system_code
         self._session = requests.Session()
+        self._login()
+
+    def _login(self) -> None:
+        """Authenticate as ROLE_SYSTEM against the manager and cache the Bearer token.
+
+        Called once at construction, and again transparently by _request() if
+        the Provider ever rejects the cached token as expired.
+        """
+        try:
+            resp = requests.post(
+                f"{self._manager_url}{_MANAGER_LOGIN_PATH}",
+                json={"systemCode": self._system_code},
+                timeout=self._timeout,
+            )
+        except requests.RequestException as exc:
+            raise ProviderError(f"System login to manager failed: {exc}") from exc
+
+        if not resp.ok:
+            raise ProviderError(f"System login to manager failed: {resp.status_code}: {resp.text}")
+
+        self._session.headers["Authorization"] = f"Bearer {resp.json()['token']}"
+        log.info("Authenticated with manager as ROLE_SYSTEM")
 
     def get_source(self, name: str) -> Optional[SourceInfo]:
         """Look up a registered source by name. Returns None if no such source exists."""
@@ -225,8 +265,17 @@ class ProviderClient:
 
         Callers are responsible for interpreting the resulting status code,
         since "expected" non-200 statuses (e.g. 400 meaning "not found") vary
-        by endpoint.
+        by endpoint. A 401 means our cached system token expired -- re-login
+        once and retry transparently before giving up.
         """
+        resp = self._send(method, path, **kwargs)
+        if resp.status_code == HTTPStatus.UNAUTHORIZED:
+            log.warning("Provider rejected our token as expired/invalid -- re-authenticating")
+            self._login()
+            resp = self._send(method, path, **kwargs)
+        return resp
+
+    def _send(self, method: str, path: str, **kwargs: Any) -> requests.Response:
         try:
             return self._session.request(
                 method, f"{self._base_url}{path}", timeout=self._timeout, **kwargs

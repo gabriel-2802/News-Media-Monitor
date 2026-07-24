@@ -64,6 +64,10 @@ public final class Constants {
     public static final String SUBSCRIPTIONS_STORY_PATH = "/story/{storyId}";
     public static final String SUBSCRIPTIONS_TOPIC_PATH = "/topic/{topicName}";
 
+    // roles (short form, for use with hasRole/hasAnyRole — Spring prepends "ROLE_")
+    public static final String ROLE_ADMIN = "ADMIN";
+    public static final String ROLE_SYSTEM = "SYSTEM";
+
     // fulltext index names
     public static final String STORY_TITLE_FULLTEXT_IDX = "story_title_fulltext_idx";
     public static final String ARTICLE_SEARCH_FULLTEXT_IDX = "article_search_fulltext_idx";

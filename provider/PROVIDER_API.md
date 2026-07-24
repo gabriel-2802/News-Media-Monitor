@@ -8,6 +8,7 @@ REST API for registering news sources and ingesting/querying scraped articles, s
 
 ## Table of contents
 
+- [Authentication](#authentication)
 - [News Sources](#news-sources)
   - [`GET /api/news-sources`](#get-apinews-sources)
   - [`GET /api/news-sources/{sourceName}`](#get-apinews-sourcessourcename)
@@ -58,6 +59,53 @@ REST API for registering news sources and ingesting/querying scraped articles, s
 
 ---
 
+## Authentication
+
+All `GET` endpoints are public — no token required. Every mutating endpoint (`POST`/`PUT`/`PATCH`/`DELETE`) requires a `Bearer` JWT in the `Authorization` header, scoped to one or more roles:
+
+```
+Authorization: Bearer <token>
+```
+
+The Provider does not issue tokens itself — it only **validates** JWTs signed with the same `jwt.secret` as the [manager service](../manager/MANAGER_API.md), which is the sole issuer. Callers authenticate against the manager and reuse that token here:
+
+- **Human callers (ROLE_ADMIN):** `POST /api/auth/login` on the manager with an admin account's email/password.
+- **Service callers (ROLE_SYSTEM):** `POST /api/auth/login` on the manager with `{"systemCode": "<shared secret>"}` and no password. The manager itself generates one such system token once at startup (for its own outbound calls into `/api/subscriptions/**`), and each Python worker (`workers/provider_client.py`) does the same at construction, transparently re-logging-in if the Provider ever responds `401` (expired token).
+
+### Required roles by endpoint
+
+| Endpoint | Roles |
+|----------|-------|
+| `POST /api/news-sources` | ROLE_ADMIN |
+| `PUT /api/news-sources/{sourceName}` | ROLE_ADMIN |
+| `PATCH /api/news-sources/{sourceName}/failure` | ROLE_ADMIN, ROLE_SYSTEM |
+| `PATCH /api/news-sources/{sourceName}/reset` | ROLE_ADMIN, ROLE_SYSTEM |
+| `POST /api/articles` | ROLE_ADMIN, ROLE_SYSTEM |
+| `PATCH /api/articles/topic` | ROLE_ADMIN, ROLE_SYSTEM |
+| `POST /api/articles/trigger-scrape` | ROLE_ADMIN |
+| `POST /api/stories` | ROLE_SYSTEM |
+| `PATCH /api/stories/{storyId}/attach` | ROLE_SYSTEM |
+| `POST /api/subscriptions/story/{storyId}` | ROLE_ADMIN, ROLE_SYSTEM |
+| `DELETE /api/subscriptions/story/{storyId}` | ROLE_ADMIN, ROLE_SYSTEM |
+| `POST /api/subscriptions/topic/{topicName}` | ROLE_ADMIN, ROLE_SYSTEM |
+| `DELETE /api/subscriptions/topic/{topicName}` | ROLE_ADMIN, ROLE_SYSTEM |
+| Every `GET` endpoint (all controllers) | none — public |
+
+### Error responses
+
+Auth failures short-circuit before reaching a controller, but still return the same [`ErrorResponse`](#errorresponse) shape as the rest of the API:
+
+| Status | Cause | `message` |
+|--------|-------|-----------|
+| 401 | Missing, malformed, or expired/invalid-signature token | `"Missing or invalid authentication token."` |
+| 403 | Valid token, but missing the required role | `"You do not have permission to perform this action."` |
+
+### Trying it in Swagger UI
+
+Swagger UI (`/news-provider/swagger-ui.html`) exposes an **Authorize** button — paste a raw token (no `Bearer ` prefix) obtained from the manager's `/api/auth/login` to exercise protected endpoints via "Try it out".
+
+---
+
 ## News Sources
 
 Base path: `/api/news-sources`
@@ -102,6 +150,8 @@ Get a single registered news source by name, including its article count.
 
 ### `POST /api/news-sources`
 
+**Requires:** `ROLE_ADMIN`
+
 Register a new news source to be scraped. The service validates the source before saving:
 
 1. Fails if a source with the same `baseUrl`, `name`, or `rssUrl` already exists.
@@ -116,10 +166,14 @@ Register a new news source to be scraped. The service validates the source befor
 |--------|------|--------------|
 | 201 | [`NewsSourceDto`](#newssourcedto) | News source created successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | Validation failed, a source with the same name/baseUrl/rssUrl already exists, domains don't match, or the URLs are unreachable |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_ADMIN` |
 
 ---
 
 ### `PUT /api/news-sources/{sourceName}`
+
+**Requires:** `ROLE_ADMIN`
 
 Replaces a news source's data with the desired final state. Fails if the new name/baseUrl/rssUrl already belongs to a different source, or if either URL is unreachable.
 
@@ -137,10 +191,14 @@ Replaces a news source's data with the desired final state. Fails if the new nam
 |--------|------|--------------|
 | 200 | [`NewsSourceDto`](#newssourcedto) | News source updated successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | Validation failed, the source does not exist, the new name/baseUrl/rssUrl already belongs to a different source, or the URLs are unreachable |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_ADMIN` |
 
 ---
 
 ### `PATCH /api/news-sources/{sourceName}/failure`
+
+**Requires:** `ROLE_ADMIN` or `ROLE_SYSTEM`
 
 Increments the consecutive scrape-failure counter for the given source. Used by the scraper to track sources that repeatedly fail to be reached. If the incremented count reaches **3**, the source is automatically disabled (`isDisabled = true`).
 
@@ -156,10 +214,14 @@ Increments the consecutive scrape-failure counter for the given source. Used by 
 |--------|------|--------------|
 | 200 | [`NewsSourceDto`](#newssourcedto) | Failure count incremented successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | News source does not exist |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_ADMIN`/`ROLE_SYSTEM` |
 
 ---
 
 ### `PATCH /api/news-sources/{sourceName}/reset`
+
+**Requires:** `ROLE_ADMIN` or `ROLE_SYSTEM`
 
 Resets a source's failure counter to `0` and re-enables it (`isDisabled = false`) if it had been disabled.
 
@@ -175,6 +237,8 @@ Resets a source's failure counter to `0` and re-enables it (`isDisabled = false`
 |--------|------|--------------|
 | 200 | [`NewsSourceDto`](#newssourcedto) | Failure count reset successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | News source does not exist |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_ADMIN`/`ROLE_SYSTEM` |
 
 ---
 
@@ -278,6 +342,8 @@ List articles tagged with a given topic, paginated.
 
 ### `POST /api/articles`
 
+**Requires:** `ROLE_ADMIN` or `ROLE_SYSTEM`
+
 Persist a scraped article. Validated before saving:
 
 1. Fails if an article with the same `url` already exists.
@@ -292,6 +358,8 @@ Persist a scraped article. Validated before saving:
 |--------|------|--------------|
 | 201 | [`ArticleDto`](#articledto) | Article created successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | Validation failed, article URL already exists, source does not exist, or the URL does not match the source's base URL |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_ADMIN`/`ROLE_SYSTEM` |
 
 ---
 
@@ -334,6 +402,8 @@ Get a single article by its canonical URL.
 
 ### `PATCH /api/articles/topic`
 
+**Requires:** `ROLE_ADMIN` or `ROLE_SYSTEM`
+
 Tags an article with a topic, replacing any topic it already had. If a [subscription](#subscriptions) exists for the topic, publishes a notification message — see [RabbitMQ side effects](#rabbitmq-side-effects).
 
 **Request body:** [`TopicSetRequest`](#topicsetrequest)
@@ -344,10 +414,14 @@ Tags an article with a topic, replacing any topic it already had. If a [subscrip
 |--------|------|--------------|
 | 200 | [`ArticleDto`](#articledto) | Topic set successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | Article does not exist |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_ADMIN`/`ROLE_SYSTEM` |
 
 ---
 
 ### `POST /api/articles/trigger-scrape`
+
+**Requires:** `ROLE_ADMIN`
 
 Publishes a scrape job for every registered news source onto the `scrape.jobs` queue, to be picked up by the scraper worker. Also runs automatically every 6 hours (see [`ScrapeScheduler`](#rabbitmq-side-effects)).
 
@@ -356,6 +430,8 @@ Publishes a scrape job for every registered news source onto the `scrape.jobs` q
 | Status | Body | Description |
 |--------|------|--------------|
 | 202 | `integer` | Number of scrape jobs queued |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_ADMIN` |
 
 ---
 
@@ -422,6 +498,8 @@ List stories that had activity within the last N days. Used to identify live clu
 
 ### `POST /api/stories`
 
+**Requires:** `ROLE_SYSTEM`
+
 Creates a new, empty story cluster with the given title.
 
 **Query parameters**
@@ -436,6 +514,8 @@ Creates a new, empty story cluster with the given title.
 |--------|------|--------------|
 | 201 | [`StoryDto`](#storydto) | Story created successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | Title is blank |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_SYSTEM` |
 
 ---
 
@@ -460,6 +540,8 @@ Returns the story cluster that the article at the given URL is attached to.
 
 ### `PATCH /api/stories/{storyId}/attach`
 
+**Requires:** `ROLE_SYSTEM`
+
 Creates a `BELONGS_TO` edge from the article to the story. Increments `articleCount` unconditionally, and `sourceCount` only if the article's source hasn't previously contributed to this story. Idempotent — re-attaching the same article has no effect. If a [subscription](#subscriptions) exists for the story, publishes a notification message — see [RabbitMQ side effects](#rabbitmq-side-effects).
 
 **Path parameters**
@@ -476,6 +558,8 @@ Creates a `BELONGS_TO` edge from the article to the story. Increments `articleCo
 |--------|------|--------------|
 | 200 | [`StoryDto`](#storydto) | Article attached successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | Story or article does not exist |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_SYSTEM` |
 
 ---
 
@@ -557,7 +641,11 @@ Base path: `/api/subscriptions`
 
 A subscription tracks interest in a story or a topic via a `count` — each subscribe call creates it at `count = 1` or increments an existing one; each unsubscribe call decrements it, deleting the subscription once `count` reaches `0`. Modeled as a `Subscription` node with a `SUBSCRIBES_TO` relationship to either a `Story` or a `Topic` node.
 
+Every endpoint in this controller requires `ROLE_ADMIN` or `ROLE_SYSTEM`.
+
 ### `POST /api/subscriptions/story/{storyId}`
+
+**Requires:** `ROLE_ADMIN` or `ROLE_SYSTEM`
 
 Creates a subscription to the given story with `count = 1`, or increments the count if one already exists.
 
@@ -573,10 +661,14 @@ Creates a subscription to the given story with `count = 1`, or increments the co
 |--------|------|--------------|
 | 200 | [`SubscriptionDto`](#subscriptiondto) | Subscribed successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | Story does not exist |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_ADMIN`/`ROLE_SYSTEM` |
 
 ---
 
 ### `DELETE /api/subscriptions/story/{storyId}`
+
+**Requires:** `ROLE_ADMIN` or `ROLE_SYSTEM`
 
 Decrements the subscription count for the given story. The subscription is deleted once the count reaches `0`.
 
@@ -592,10 +684,14 @@ Decrements the subscription count for the given story. The subscription is delet
 |--------|------|--------------|
 | 204 | — | Unsubscribed successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | No subscription exists for this story |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_ADMIN`/`ROLE_SYSTEM` |
 
 ---
 
 ### `POST /api/subscriptions/topic/{topicName}`
+
+**Requires:** `ROLE_ADMIN` or `ROLE_SYSTEM`
 
 Creates a subscription to the given topic with `count = 1`, or increments the count if one already exists.
 
@@ -611,10 +707,14 @@ Creates a subscription to the given topic with `count = 1`, or increments the co
 |--------|------|--------------|
 | 200 | [`SubscriptionDto`](#subscriptiondto) | Subscribed successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | Topic does not exist |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_ADMIN`/`ROLE_SYSTEM` |
 
 ---
 
 ### `DELETE /api/subscriptions/topic/{topicName}`
+
+**Requires:** `ROLE_ADMIN` or `ROLE_SYSTEM`
 
 Decrements the subscription count for the given topic. The subscription is deleted once the count reaches `0`.
 
@@ -630,6 +730,8 @@ Decrements the subscription count for the given topic. The subscription is delet
 |--------|------|--------------|
 | 204 | — | Unsubscribed successfully |
 | 400 | [`ErrorResponse`](#errorresponse) | No subscription exists for this topic |
+| 401 | [`ErrorResponse`](#errorresponse) | Missing/invalid token — see [Authentication](#authentication) |
+| 403 | [`ErrorResponse`](#errorresponse) | Token lacks `ROLE_ADMIN`/`ROLE_SYSTEM` |
 
 ---
 
@@ -879,3 +981,5 @@ All exceptions are mapped to an [`ErrorResponse`](#errorresponse) by a global ex
 | `ResponseStatusException`             | (as thrown) | Explicit `throw new ResponseStatusException(...)` |
 | `BusinessException`                   | 400    | Domain rule violations (duplicate source/article, mismatched URLs, unreachable URLs, unknown source/story/topic, subscription not found) |
 | Any other unhandled exception         | 500    | Generic `"Unexpected error occurred"` message, no internal details leaked |
+
+Authentication/authorization failures don't go through this handler (Spring Security intercepts before the controller layer), but still produce the same `ErrorResponse` shape — see [Authentication](#authentication) for the 401/403 cases.
