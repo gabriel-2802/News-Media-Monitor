@@ -2,6 +2,7 @@ package news.media.monitor.manager.services;
 
 import news.media.monitor.manager.dto.responses.NotificationResponse;
 import news.media.monitor.manager.exceptions.exceptions.ResourceNotFoundException;
+import news.media.monitor.manager.models.Notification;
 import news.media.monitor.manager.repositories.NotificationRepository;
 import news.media.monitor.manager.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,9 @@ public class NotificationService {
 
     private static final String LOG_MARKED_SEEN = "Marked {} notification(s) as seen for user {}";
     private static final String LOG_DELETED     = "Deleted {} notification(s) for user {}";
+    private static final String LOG_CREATING_FOR_USERS = "Creating notification for {} user(s): '{}'";
+    private static final String LOG_CREATED_FOR_USER   = "Created notification for user {}";
+    private static final String LOG_CREATED_FOR_USERS  = "Created {} notification(s) for {} user(s)";
 
     private final NotificationRepository notificationRepository;
     private final UserRepository         userRepository;
@@ -55,6 +59,28 @@ public class NotificationService {
         Long userId = resolveUserId(email);
         long deleted = notificationRepository.deleteByUserIdAndIdIn(userId, ids);
         log.info(LOG_DELETED, deleted, userId);
+    }
+
+    @Transactional
+    public void createForUsers(List<Long> userIds, String message) {
+        if (userIds.isEmpty()) {
+            return;
+        }
+
+        log.info(LOG_CREATING_FOR_USERS, userIds.size(), message);
+
+        List<Notification> notifications = userIds.stream()
+                .map(userId -> {
+                    Notification notification = new Notification();
+                    notification.setUser(userRepository.getReferenceById(userId));
+                    notification.setMessage(message);
+                    log.debug(LOG_CREATED_FOR_USER, userId);
+                    return notification;
+                })
+                .toList();
+
+        notificationRepository.saveAll(notifications);
+        log.info(LOG_CREATED_FOR_USERS, notifications.size(), userIds.size());
     }
 
     private Pageable pageable(int page, int size) {
