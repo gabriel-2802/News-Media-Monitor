@@ -70,6 +70,7 @@ from clusterer.embedder import ArticleEmbedder
 from env_config import require_env, require_float, require_int
 from log_config import configure_logging
 from provider_client import ProviderClient, ProviderError
+from retry import call_with_retry
 
 # ---------------------------------------------------------------------------
 # Config
@@ -265,7 +266,11 @@ class Worker:
 
     def run(self) -> None:
         provider = ProviderClient(self._provider_url)
-        qdrant = QdrantClient(url=self._qdrant_url, api_key=self._qdrant_api_key)
+        qdrant = QdrantClient(
+            url=self._qdrant_url,
+            api_key=self._qdrant_api_key,
+            check_compatibility=False,
+        )
         ensure_collection(qdrant)
 
         log.info("Loading embedding model…")
@@ -299,10 +304,13 @@ class Worker:
             body: bytes,
         ) -> None:
             try:
-                handler.handle(method, body, ch)
+                call_with_retry(lambda: handler.handle(method, body, ch), connection.sleep)
             except ProviderError as exc:
-                log.error("Provider unreachable — nacking for requeue: %s", exc)
+                log.error(
+                    "Provider still unreachable — nacking for requeue and shutting down: %s", exc
+                )
                 _safe_nack(ch, method.delivery_tag)
+                ch.stop_consuming()
             except Exception as exc:
                 log.exception("Unhandled crash processing message — nacking for requeue: %s", exc)
                 _safe_nack(ch, method.delivery_tag)

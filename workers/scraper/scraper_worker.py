@@ -67,6 +67,7 @@ from scraper.news_scraper import (
 from env_config import require_env, require_int
 from log_config import configure_logging
 from provider_client import ProviderClient, ProviderError, SourceInfo
+from retry import call_with_retry
 
 # ---------------------------------------------------------------------------
 # Config
@@ -276,10 +277,13 @@ class Worker:
             body: bytes,
         ) -> None:
             try:
-                handler.handle(method, body)
+                call_with_retry(lambda: handler.handle(method, body), connection.sleep)
             except ProviderError as exc:
-                log.error("Provider unreachable — nacking for requeue: %s", exc)
+                log.error(
+                    "Provider still unreachable — nacking for requeue and shutting down: %s", exc
+                )
                 _safe_nack(ch, method.delivery_tag)
+                ch.stop_consuming()
             except Exception as exc:
                 log.exception("Unhandled crash processing message — nacking for requeue: %s", exc)
                 _safe_nack(ch, method.delivery_tag)
