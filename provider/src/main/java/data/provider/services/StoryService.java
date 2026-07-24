@@ -1,5 +1,7 @@
 package data.provider.services;
 
+import data.provider.dto.messages.ArticleNotificationMessage;
+import data.provider.dto.messages.NotificationType;
 import data.provider.dto.requests.AttachArticleRequest;
 import data.provider.dto.responses.ArticleDto;
 import data.provider.dto.responses.StoryDto;
@@ -7,10 +9,13 @@ import data.provider.exceptions.BusinessException;
 import data.provider.models.Story;
 import data.provider.repositories.ArticleRepository;
 import data.provider.repositories.StoryRepository;
+import data.provider.repositories.SubscriptionRepository;
 import data.provider.util.Constants;
 import data.provider.util.FullTextSearchUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +37,11 @@ public class StoryService {
 
     private final StoryRepository storyRepository;
     private final ArticleRepository articleRepository;
+    private final SubscriptionRepository subscriptionRepository;
+    private final RabbitTemplate rabbitTemplate;
+
+    @Value("${rabbitmq.article-notifications-queue}")
+    private String articleNotificationsQueue;
 
     public StoryDto createStory(final String title) {
         final Instant now = Instant.now();
@@ -55,7 +65,20 @@ public class StoryService {
         final Story updated = storyRepository.attachArticle(storyId, request.articleUrl(), Instant.now())
                 .orElseThrow(() -> new BusinessException(Constants.STORY_DOES_NOT_EXIST_ERROR, storyId));
 
+        notifySubscribers(updated, request.articleUrl());
+
         return new StoryDto(updated);
+    }
+
+    private void notifySubscribers(final Story story, final String articleUrl) {
+        if (!subscriptionRepository.existsByStoryId(story.getId())) {
+            log.info(Constants.ARTICLE_NOTIFICATION_SKIPPED_LOG, NotificationType.STORY, story.getTitle(), articleUrl);
+            return;
+        }
+
+        rabbitTemplate.convertAndSend(articleNotificationsQueue,
+                new ArticleNotificationMessage(story.getTitle(), articleUrl, NotificationType.STORY));
+        log.info(Constants.ARTICLE_NOTIFICATION_PUBLISHED_LOG, NotificationType.STORY, story.getTitle(), articleUrl);
     }
 
     public List<StoryDto> getRecentStories(final int days) {

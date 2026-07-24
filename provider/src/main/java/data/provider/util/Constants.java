@@ -15,12 +15,16 @@ public final class Constants {
     public static final String NEWS_SOURCE_DOMAIN_MISMATCH_ERROR = "RSS URL domain does not match base URL domain: baseUrl = {}, rssUrl = {}.";
     public static final String ARTICLE_DOES_NOT_EXIST_ERROR = "Article with the URL = {} does not exist.";
     public static final String TOPIC_WITH_NAME_DOES_NOT_EXIST_ERROR = "Topic with the name = {} does not exist.";
+    public static final String SUBSCRIPTION_TO_STORY_DOES_NOT_EXIST_ERROR = "Subscription to story with id = {} does not exist.";
+    public static final String SUBSCRIPTION_TO_TOPIC_DOES_NOT_EXIST_ERROR = "Subscription to topic with name = {} does not exist.";
 
     // logs
     public static final String NEWS_SOURCE_ADD_SUCCESS_LOG = "News source saved successfully: name={}, id={}";
     public static final String NEWS_SOURCE_UPDATE_SUCCESS_LOG = "News source updated successfully: name={}, id={}";
     public static final String V1_CLASSIFIER_CREATED_LOG = "ClassificationEngineV1 initialized with API URL: {}";
     public static final String SCRAPE_TRIGGERED_LOG = "Scrape triggered: queued {} job(s) on the scrape jobs queue.";
+    public static final String ARTICLE_NOTIFICATION_PUBLISHED_LOG = "Published {} notification: name={}, articleUrl={}";
+    public static final String ARTICLE_NOTIFICATION_SKIPPED_LOG = "No subscription for {} '{}' — skipping notification for article {}";
 
     // paths
     public static final String ARTICLES_BASE_PATH = "/api/articles";
@@ -54,6 +58,11 @@ public final class Constants {
     // topic paths
     public static final String TOPICS_BASE_PATH = "/api/topics";
     public static final String TOPICS_EXISTS_PATH = "/exists";
+
+    // subscription paths
+    public static final String SUBSCRIPTIONS_BASE_PATH = "/api/subscriptions";
+    public static final String SUBSCRIPTIONS_STORY_PATH = "/story/{storyId}";
+    public static final String SUBSCRIPTIONS_TOPIC_PATH = "/topic/{topicName}";
 
     // fulltext index names
     public static final String STORY_TITLE_FULLTEXT_IDX = "story_title_fulltext_idx";
