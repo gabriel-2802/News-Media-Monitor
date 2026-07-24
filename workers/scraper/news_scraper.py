@@ -757,23 +757,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-# ---------------------------------------------------------------------------
-# CHANGELOG (robustness hardening)
-# ---------------------------------------------------------------------------
-# 1. JsonlStorage now loads existing URLs on init; exists() works, so re-runs
-#    skip already-scraped articles instead of duplicating the whole file.
-# 2. _build_robots fetches robots.txt with a timeout and fails OPEN with a
-#    warning. Previously a failed/hanging read() made can_fetch() return False
-#    for every URL, silently dropping the entire source.
-# 3. scrape_all wraps each source in try/except: one crashing source no longer
-#    aborts the batch. KeyboardInterrupt stops cleanly.
-# 4. PlaywrightFetcher reuses a single browser process across the whole run
-#    (was launching Chromium per article) and is always closed via close() /
-#    context-manager teardown, even on Ctrl-C.
-# 5. HTTP retries honour Retry-After on 429 (capped at MAX_RETRY_SLEEP); robots
-#    Crawl-delay is respected per source.
-# 6. Extraction/body-length calls are wrapped so a trafilatura crash on one
-#    page degrades gracefully instead of killing the entry.
-# 7. Stats gained a `skipped` counter for visibility into dedup/robots skips.
