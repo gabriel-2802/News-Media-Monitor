@@ -68,28 +68,40 @@ curl -s -u "${AUTH}" -X POST "${BASE}/bindings/news_monitor/e/news_monitor/q/scr
 -d '{"routing_key":"scrape.job","arguments":{}}'
 echo ""
 
-echo "[setup] Creating queue: clustering"
-curl -s -u "${AUTH}" -X PUT "${BASE}/queues/news_monitor/clustering" \
+echo "[setup] Creating queue: article.classify"
+curl -s -u "${AUTH}" -X PUT "${BASE}/queues/news_monitor/article.classify" \
 -H "Content-Type: application/json" \
 -d '{"durable":true,"auto_delete":false,"arguments":{}}'
 echo ""
 
-echo "[setup] Binding clustering -> news_monitor (routing_key: article.clustering)"
-curl -s -u "${AUTH}" -X POST "${BASE}/bindings/news_monitor/e/news_monitor/q/clustering" \
+echo "[setup] Binding article.classify -> news_monitor (routing_key: article.saved)"
+curl -s -u "${AUTH}" -X POST "${BASE}/bindings/news_monitor/e/news_monitor/q/article.classify" \
 -H "Content-Type: application/json" \
--d '{"routing_key":"article.clustering","arguments":{}}'
+-d '{"routing_key":"article.saved","arguments":{}}'
 echo ""
 
-echo "[setup] Creating queue: embedding"
-curl -s -u "${AUTH}" -X PUT "${BASE}/queues/news_monitor/embedding" \
+echo "[setup] Creating queue: article.cluster"
+curl -s -u "${AUTH}" -X PUT "${BASE}/queues/news_monitor/article.cluster" \
 -H "Content-Type: application/json" \
 -d '{"durable":true,"auto_delete":false,"arguments":{}}'
 echo ""
 
-echo "[setup] Binding embedding -> news_monitor (routing_key: article.clustering)"
-curl -s -u "${AUTH}" -X POST "${BASE}/bindings/news_monitor/e/news_monitor/q/embedding" \
+echo "[setup] Binding article.cluster -> news_monitor (routing_key: article.saved)"
+curl -s -u "${AUTH}" -X POST "${BASE}/bindings/news_monitor/e/news_monitor/q/article.cluster" \
 -H "Content-Type: application/json" \
--d '{"routing_key":"article.clustering","arguments":{}}'
+-d '{"routing_key":"article.saved","arguments":{}}'
+echo ""
+
+# Provider-only queue: the Provider publishes directly to it by name via the
+# default exchange (routing key == queue name), so it must NOT be bound to
+# the news_monitor topic exchange — binding it to article.saved (or any
+# other routing key shared with the classify/cluster fan-out) would leak
+# every scraped article into this queue alongside the real subscription
+# notifications.
+echo "[setup] Creating queue: article.notifications"
+curl -s -u "${AUTH}" -X PUT "${BASE}/queues/news_monitor/article.notifications" \
+-H "Content-Type: application/json" \
+-d '{"durable":true,"auto_delete":false,"arguments":{}}'
 echo ""
 
 echo "[setup] ✓ RabbitMQ topology is ready."
