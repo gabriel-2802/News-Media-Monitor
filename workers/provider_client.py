@@ -68,7 +68,8 @@ class SourceInfo:
             disabled=row["disabled"],
             failure_count=row["failureCount"],
         )
-    
+
+
 @dataclass(frozen=True)
 class ArticleInfo:
     author: Optional[str]
@@ -155,7 +156,7 @@ class ProviderClient:
         raise ProviderError(
             f"POST {_ARTICLES_PATH}: unexpected status {resp.status_code}: {resp.text}"
         )
-    
+
     def get_article(self, url: str) -> Optional[ArticleInfo]:
         """Look up an article by its canonical URL. Returns None if no such article exists."""
         resp = self._request("GET", _ARTICLE_BY_URL_PATH, params={"url": url})

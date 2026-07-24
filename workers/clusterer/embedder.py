@@ -18,7 +18,7 @@ if str(_WORKERS_DIR) not in sys.path:
 
 from env_config import require_env  # noqa: E402
 
-MODEL_NAME = require_env("EMBEDDING_MODEL_NAME")  # see data/output/validation_report.md — 27x smaller than Qwen3-Embedding-0.6B for a 90.8%->88.0% balanced-accuracy tradeoff
+MODEL_NAME = require_env("EMBEDDING_MODEL_NAME")  # see data/output/embedding_validation_results_*.json — 27x smaller than Qwen3-Embedding-0.6B for a 90.8%->88.0% balanced-accuracy tradeoff
 
 
 class ArticleEmbedder:
