@@ -5,6 +5,8 @@ NEO4J_PASSWORD    ?= secretsecret
 RABBITMQ_USER     ?= admin
 RABBITMQ_PASSWORD ?= secret
 RABBITMQ_VHOST    ?= news_monitor
+POSTGRES_USER     ?= postgres
+POSTGRES_DB       ?= news_monitor
 
 .PHONY: help
 help: ## Show available targets
@@ -190,6 +192,20 @@ qdrant-purge: ## Delete the story_centroids Qdrant collection (recreated automat
 	@echo "⚠️  WARNING: this deletes all story centroid vectors in Qdrant."
 	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
 	@$(MAKE) _qdrant-purge-exec
+
+# ── Postgres ───────────────────────────────────────────────────────────────────
+
+.PHONY: _postgres-purge-exec
+_postgres-purge-exec:
+	$(COMPOSE) exec -T postgres psql -U $(POSTGRES_USER) -d $(POSTGRES_DB) \
+	  -c "DROP SCHEMA IF EXISTS users CASCADE;"
+
+.PHONY: postgres-purge
+postgres-purge: ## Drop the users schema (all tables + migration history) — DESTRUCTIVE
+	@echo "⚠️  WARNING: this deletes ALL data in Postgres (users, roles, migration history)."
+	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
+	@$(MAKE) _postgres-purge-exec
+	@echo "✓ Postgres purged. Restart the manager service to reapply schema migrations."
 
 # ── Combined cleanup ───────────────────────────────────────────────────────────
 
