@@ -135,6 +135,15 @@ public class ArticleController {
         return ResponseEntity.ok(articleService.setTopic(topicSetRequest));
     }
 
+    @PostMapping(Constants.ARTICLES_TRIGGER_SCRAPE_PATH)
+    @Operation(summary = "Trigger a scrape of all news sources", description = "Publishes a scrape job for every registered news source onto the "
+            + "scrape jobs queue, to be picked up by the scraper worker. Runs automatically every 6 hours as well.")
+    @ApiResponse(responseCode = "202", description = "Scrape jobs queued successfully",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = Integer.class)))
+    public ResponseEntity<Integer> triggerScrape() {
+        return ResponseEntity.accepted().body(articleService.triggerScrape());
+    }
+
     @GetMapping(Constants.ARTICLES_SEARCH_PATH)
     @Operation(summary = "Search articles by title or body", description = "Full-text search over article titles and body text, ordered by "
             + "relevance. Matching is prefix-based per term (e.g. \"sen bud\" matches text containing words starting with sen and bud).")

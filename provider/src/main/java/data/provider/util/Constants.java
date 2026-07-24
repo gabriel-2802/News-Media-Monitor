@@ -20,6 +20,7 @@ public final class Constants {
     public static final String NEWS_SOURCE_ADD_SUCCESS_LOG = "News source saved successfully: name={}, id={}";
     public static final String NEWS_SOURCE_UPDATE_SUCCESS_LOG = "News source updated successfully: name={}, id={}";
     public static final String V1_CLASSIFIER_CREATED_LOG = "ClassificationEngineV1 initialized with API URL: {}";
+    public static final String SCRAPE_TRIGGERED_LOG = "Scrape triggered: queued {} job(s) on the scrape jobs queue.";
 
     // paths
     public static final String ARTICLES_BASE_PATH = "/api/articles";
@@ -33,12 +34,14 @@ public final class Constants {
     public static final String ARTICLES_BY_URL_PATH = "/by-url";
     public static final String ARTICLES_SET_TOPIC_PATH = "/topic";
     public static final String ARTICLES_BY_STORY_PATH = "/story/{storyId}";
+    public static final String ARTICLES_TRIGGER_SCRAPE_PATH = "/trigger-scrape";
 
     // story paths
     public static final String STORIES_BASE_PATH = "/api/stories";
     public static final String STORIES_ATTACH_PATH = "/{storyId}/attach";
     public static final String STORIES_RECENT_PATH = "/recent";
     public static final String STORIES_BY_ARTICLE_PATH = "/by-article";
+    public static final String STORIES_EXISTS_PATH = "/exists";
 
     // story errors
     public static final String STORY_DOES_NOT_EXIST_ERROR = "Story with id = {} does not exist.";
@@ -47,6 +50,10 @@ public final class Constants {
     // search paths
     public static final String STORIES_SEARCH_PATH = "/search";
     public static final String ARTICLES_SEARCH_PATH = "/search";
+
+    // topic paths
+    public static final String TOPICS_BASE_PATH = "/api/topics";
+    public static final String TOPICS_EXISTS_PATH = "/exists";
 
     // fulltext index names
     public static final String STORY_TITLE_FULLTEXT_IDX = "story_title_fulltext_idx";

@@ -1,6 +1,10 @@
+server:
+  servlet:
+    context-path: /news-provider
+
 spring:
   application:
-    name: provider
+    name: news-provider
   neo4j:
     uri: bolt://localhost:7687
     authentication:
@@ -9,6 +13,10 @@ spring:
   data:
     neo4j:
       database: neo4j
+
+rabbitmq:
+  url: ${RABBITMQ_URL:amqp://admin:secret@localhost:5672/news_monitor}
+  scrape-jobs-queue: ${SCRAPE_JOBS_QUEUE:scrape.jobs}
 
 springdoc:
   api-docs:

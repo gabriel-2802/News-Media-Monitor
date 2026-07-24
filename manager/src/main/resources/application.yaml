@@ -1,0 +1,35 @@
+server:
+  port: ${SERVER_PORT:9000}
+  servlet:
+    context-path: /manager
+
+spring:
+  application:
+    name: manager
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:news_monitor}
+    username: ${DB_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:secret}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: users
+
+jwt:
+  secret: ${JWT_SECRET:local-dev-jwt-signing-secret-please-change-me}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+app:
+  admin:
+    email: ${APP_ADMIN_EMAIL:admin@example.com}
+    password: ${APP_ADMIN_PASSWORD:Admin123!}
+    name: ${APP_ADMIN_NAME:Admin}
+    register-code: ${APP_ADMIN_REGISTER_CODE:devcode123}
+  system:
+    code: ${APP_SYSTEM_CODE:devsystemcode123}
