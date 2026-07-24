@@ -1,5 +1,7 @@
 package data.provider.services;
 
+import data.provider.dto.messages.ArticleNotificationMessage;
+import data.provider.dto.messages.NotificationType;
 import data.provider.dto.messages.ScrapeJobMessage;
 import data.provider.dto.requests.ArticleRequest;
 import data.provider.dto.requests.TopicSetRequest;
@@ -10,6 +12,7 @@ import data.provider.models.NewsSource;
 import data.provider.models.Topic;
 import data.provider.repositories.ArticleRepository;
 import data.provider.repositories.NewsSourceRepository;
+import data.provider.repositories.SubscriptionRepository;
 import data.provider.repositories.TopicRepository;
 import data.provider.util.Constants;
 import data.provider.util.FullTextSearchUtil;
@@ -30,10 +33,14 @@ public class ArticleService {
     private final ArticleRepository articleRepository;
     private final NewsSourceRepository newsSourceRepository;
     private final TopicRepository topicRepository;
+    private final SubscriptionRepository subscriptionRepository;
     private final RabbitTemplate rabbitTemplate;
 
     @Value("${rabbitmq.scrape-jobs-queue}")
     private String scrapeJobsQueue;
+
+    @Value("${rabbitmq.article-notifications-queue}")
+    private String articleNotificationsQueue;
 
     public List<ArticleDto> getAllArticles(final int page, final int count) {
         return articleRepository
@@ -92,7 +99,20 @@ public class ArticleService {
 
         final Article article = articleRepository.setTopic(topicSetRequest.url(), topicSetRequest.topic());
 
+        notifySubscribers(topicSetRequest.topic(), topicSetRequest.url());
+
         return new ArticleDto(article);
+    }
+
+    private void notifySubscribers(final String topicName, final String articleUrl) {
+        if (!subscriptionRepository.existsByTopicName(topicName)) {
+            log.info(Constants.ARTICLE_NOTIFICATION_SKIPPED_LOG, NotificationType.TOPIC, topicName, articleUrl);
+            return;
+        }
+
+        rabbitTemplate.convertAndSend(articleNotificationsQueue,
+                new ArticleNotificationMessage(topicName, articleUrl, NotificationType.TOPIC));
+        log.info(Constants.ARTICLE_NOTIFICATION_PUBLISHED_LOG, NotificationType.TOPIC, topicName, articleUrl);
     }
 
     public List<ArticleDto> getArticlesByStory(final int page, final int count, final String storyId) {
