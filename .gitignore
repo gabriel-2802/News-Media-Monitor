@@ -3,3 +3,5 @@
 **/venv/
 **/.mypy_cache/
 workers/clusterer/data/
+.vscode/
+.DS_Store
