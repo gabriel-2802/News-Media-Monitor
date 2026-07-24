@@ -8,3 +8,4 @@ tqdm
 pika
 qdrant-client
 python-dotenv
+urllib3<2
