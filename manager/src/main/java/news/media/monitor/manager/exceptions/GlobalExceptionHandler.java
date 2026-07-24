@@ -30,6 +30,8 @@ public class GlobalExceptionHandler {
     private static final String SLUG_ACCESS_DENIED        = "access-denied";
     private static final String SLUG_VALIDATION_FAILED    = "validation-failed";
     private static final String SLUG_INTERNAL_ERROR       = "internal-error";
+    private static final String SLUG_DUPLICATE_SUBSCRIPTION = "duplicate-subscription";
+    private static final String SLUG_EXTERNAL_SERVICE     = "external-service-error";
 
     private static final String KEY_TIMESTAMP             = "timestamp";
     private static final String KEY_ERRORS                = "errors";
@@ -47,6 +49,8 @@ public class GlobalExceptionHandler {
     private static final String LOG_ACCESS_DENIED         = "Access denied: {}";
     private static final String LOG_VALIDATION_FAILED     = "Validation failed: {}";
     private static final String LOG_UNHANDLED_EXCEPTION   = "Unhandled exception";
+    private static final String LOG_DUPLICATE_SUBSCRIPTION = "Duplicate subscription: {}";
+    private static final String LOG_EXTERNAL_SERVICE      = "External service call failed: {}";
 
     @ExceptionHandler(DuplicateEmailException.class)
     public ProblemDetail handleDuplicateEmail(DuplicateEmailException ex) {
@@ -64,6 +68,18 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleResourceNotFound(ResourceNotFoundException ex) {
         log.warn(LOG_RESOURCE_NOT_FOUND, ex.getMessage());
         return problem(HttpStatus.NOT_FOUND, ex.getMessage(), SLUG_RESOURCE_NOT_FOUND);
+    }
+
+    @ExceptionHandler(DuplicateSubscriptionException.class)
+    public ProblemDetail handleDuplicateSubscription(DuplicateSubscriptionException ex) {
+        log.warn(LOG_DUPLICATE_SUBSCRIPTION, ex.getMessage());
+        return problem(HttpStatus.CONFLICT, ex.getMessage(), SLUG_DUPLICATE_SUBSCRIPTION);
+    }
+
+    @ExceptionHandler(ExternalServiceException.class)
+    public ProblemDetail handleExternalService(ExternalServiceException ex) {
+        log.error(LOG_EXTERNAL_SERVICE, ex.getMessage(), ex);
+        return problem(HttpStatus.BAD_GATEWAY, ex.getMessage(), SLUG_EXTERNAL_SERVICE);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

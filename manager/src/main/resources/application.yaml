@@ -25,6 +25,11 @@ jwt:
   secret: ${JWT_SECRET:local-dev-jwt-signing-secret-please-change-me}
   expiration: ${JWT_EXPIRATION:86400000}
 
+rabbitmq:
+  url: ${RABBITMQ_URL:amqp://admin:secret@localhost:5672/news_monitor}
+  scrape-jobs-queue: ${SCRAPE_JOBS_QUEUE:scrape.jobs}
+  article-notifications-queue: ${ARTICLE_NOTIFICATIONS_QUEUE:article.notifications}
+
 app:
   admin:
     email: ${APP_ADMIN_EMAIL:admin@example.com}
@@ -33,3 +38,5 @@ app:
     register-code: ${APP_ADMIN_REGISTER_CODE:devcode123}
   system:
     code: ${APP_SYSTEM_CODE:devsystemcode123}
+  news-provider:
+    base-url: ${APP_NEWS_PROVIDER_BASE_URL:http://localhost:8080/news-provider}

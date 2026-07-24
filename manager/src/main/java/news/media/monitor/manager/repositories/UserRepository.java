@@ -3,6 +3,8 @@ package news.media.monitor.manager.repositories;
 import news.media.monitor.manager.models.User;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -25,5 +27,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmail(String email);
 
-    Optional<Long> findIdByEmail(String email);
+    @Query("select u.id from User u where u.email = :email")
+    Optional<Long> findIdByEmail(@Param("email") String email);
 }

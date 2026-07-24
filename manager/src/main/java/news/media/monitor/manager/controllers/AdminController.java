@@ -2,6 +2,7 @@ package news.media.monitor.manager.controllers;
 
 import news.media.monitor.manager.dto.requests.ResetPasswordRequest;
 import news.media.monitor.manager.dto.requests.UpdateUserRequest;
+import news.media.monitor.manager.dto.responses.PageResponse;
 import news.media.monitor.manager.dto.responses.UserResponse;
 import news.media.monitor.manager.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,7 +12,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -58,7 +58,7 @@ public class AdminController {
                     @ApiResponse(responseCode = "403", description = "Caller does not have ROLE_ADMIN")
             }
     )
-    public ResponseEntity<Page<UserResponse>> getAll(
+    public ResponseEntity<PageResponse<UserResponse>> getAll(
             @Parameter(description = "Zero-based page index (default: 0)")
             @RequestParam(required = false) Integer page,
             @Parameter(description = "Page size (default: 20)")
@@ -67,7 +67,7 @@ public class AdminController {
         int p = Objects.nonNull(page) ? page : DEFAULT_PAGE;
         int s = Objects.nonNull(size) ? size : DEFAULT_PAGE_SIZE;
 
-        return ResponseEntity.ok(userService.getAll(p, s));
+        return ResponseEntity.ok(PageResponse.from(userService.getAll(p, s)));
     }
 
     @PutMapping("/{id}")

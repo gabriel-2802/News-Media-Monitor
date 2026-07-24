@@ -1,29 +1,18 @@
 package news.media.monitor.manager.controllers;
 
-import news.media.monitor.manager.dto.requests.NotificationIdsRequest;
 import news.media.monitor.manager.dto.requests.ResetPasswordRequest;
 import news.media.monitor.manager.dto.requests.UpdateAccountRequest;
-import news.media.monitor.manager.dto.responses.NotificationResponse;
 import news.media.monitor.manager.dto.responses.UserResponse;
-import news.media.monitor.manager.services.NotificationService;
 import news.media.monitor.manager.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Objects;
-
-import static news.media.monitor.manager.utils.Constants.DEFAULT_PAGE;
-import static news.media.monitor.manager.utils.Constants.DEFAULT_PAGE_SIZE;
 
 @RestController
 @RequestMapping("/api/users")
@@ -32,8 +21,7 @@ import static news.media.monitor.manager.utils.Constants.DEFAULT_PAGE_SIZE;
 @SecurityRequirement(name = "bearerAuth")
 public class AccountController {
 
-    private final UserService         userService;
-    private final NotificationService notificationService;
+    private final UserService userService;
 
     @GetMapping("/me")
     @Operation(
@@ -44,8 +32,8 @@ public class AccountController {
                     @ApiResponse(responseCode = "401", description = "Missing or invalid Bearer token")
             }
     )
-    public ResponseEntity<UserResponse> getMe(@AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(userService.getByEmail(userDetails.getUsername()));
+    public ResponseEntity<UserResponse> getMe(@AuthenticationPrincipal String email) {
+        return ResponseEntity.ok(userService.getByEmail(email));
     }
 
     @PutMapping("/me")
@@ -60,9 +48,9 @@ public class AccountController {
             }
     )
     public ResponseEntity<UserResponse> updateMe(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @AuthenticationPrincipal String email,
             @Valid @RequestBody UpdateAccountRequest request) {
-        return ResponseEntity.ok(userService.updateOwnAccount(userDetails.getUsername(), request));
+        return ResponseEntity.ok(userService.updateOwnAccount(email, request));
     }
 
     @PatchMapping("/me/password")
@@ -76,90 +64,8 @@ public class AccountController {
             }
     )
     public ResponseEntity<UserResponse> changeMyPassword(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @AuthenticationPrincipal String email,
             @Valid @RequestBody ResetPasswordRequest request) {
-        return ResponseEntity.ok(userService.changeOwnPassword(userDetails.getUsername(), request));
-    }
-
-    @GetMapping("/me/notifications")
-    @Operation(
-            summary = "List current user's notifications",
-            description = "Returns a paginated list of all notifications belonging to the currently authenticated user, "
-                    + "seen and unseen, sorted by creation date descending.",
-            responses = {
-                    @ApiResponse(responseCode = "200", description = "Paginated notification list returned"),
-                    @ApiResponse(responseCode = "401", description = "Missing or invalid Bearer token")
-            }
-    )
-    public ResponseEntity<Page<NotificationResponse>> getMyNotifications(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Parameter(description = "Zero-based page index (default: 0)")
-            @RequestParam(required = false) Integer page,
-            @Parameter(description = "Page size (default: 15)")
-            @RequestParam(required = false) Integer size) {
-        return ResponseEntity.ok(notificationService.getAll(userDetails.getUsername(), pageOf(page), sizeOf(size)));
-    }
-
-    @GetMapping("/me/notifications/unseen")
-    @Operation(
-            summary = "List current user's unseen notifications",
-            description = "Returns a paginated list of notifications belonging to the currently authenticated user "
-                    + "that have not been marked as seen, sorted by creation date descending.",
-            responses = {
-                    @ApiResponse(responseCode = "200", description = "Paginated unseen notification list returned"),
-                    @ApiResponse(responseCode = "401", description = "Missing or invalid Bearer token")
-            }
-    )
-    public ResponseEntity<Page<NotificationResponse>> getMyUnseenNotifications(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Parameter(description = "Zero-based page index (default: 0)")
-            @RequestParam(required = false) Integer page,
-            @Parameter(description = "Page size (default: 15)")
-            @RequestParam(required = false) Integer size) {
-        return ResponseEntity.ok(notificationService.getUnseen(userDetails.getUsername(), pageOf(page), sizeOf(size)));
-    }
-
-    @PatchMapping("/me/notifications/seen")
-    @Operation(
-            summary = "Mark notifications as seen",
-            description = "Marks one or more of the currently authenticated user's own notifications as seen. "
-                    + "IDs that don't exist or don't belong to the caller are silently ignored.",
-            responses = {
-                    @ApiResponse(responseCode = "204", description = "Notifications marked as seen successfully"),
-                    @ApiResponse(responseCode = "400", description = "Invalid request body"),
-                    @ApiResponse(responseCode = "401", description = "Missing or invalid Bearer token")
-            }
-    )
-    public ResponseEntity<Void> markNotificationsSeen(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody NotificationIdsRequest request) {
-        notificationService.markSeen(userDetails.getUsername(), request.ids());
-        return ResponseEntity.noContent().build();
-    }
-
-    @DeleteMapping("/me/notifications")
-    @Operation(
-            summary = "Delete notifications",
-            description = "Permanently deletes one or more of the currently authenticated user's own notifications. "
-                    + "IDs that don't exist or don't belong to the caller are silently ignored.",
-            responses = {
-                    @ApiResponse(responseCode = "204", description = "Notifications deleted successfully"),
-                    @ApiResponse(responseCode = "400", description = "Invalid request body"),
-                    @ApiResponse(responseCode = "401", description = "Missing or invalid Bearer token")
-            }
-    )
-    public ResponseEntity<Void> deleteNotifications(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody NotificationIdsRequest request) {
-        notificationService.delete(userDetails.getUsername(), request.ids());
-        return ResponseEntity.noContent().build();
-    }
-
-    private int pageOf(Integer page) {
-        return Objects.nonNull(page) ? page : DEFAULT_PAGE;
-    }
-
-    private int sizeOf(Integer size) {
-        return Objects.nonNull(size) ? size : DEFAULT_PAGE_SIZE;
+        return ResponseEntity.ok(userService.changeOwnPassword(email, request));
     }
 }
