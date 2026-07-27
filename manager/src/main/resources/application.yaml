@@ -22,7 +22,8 @@ spring:
         default_schema: users
 
 jwt:
-  secret: ${JWT_SECRET:local-dev-jwt-signing-secret-please-change-me}
+  private-key-path: ${JWT_PRIVATE_KEY_PATH:../keys/jwt-private.pem}
+  public-key-path: ${JWT_PUBLIC_KEY_PATH:../keys/jwt-public.pem}
   expiration: ${JWT_EXPIRATION:86400000}
 
 rabbitmq:

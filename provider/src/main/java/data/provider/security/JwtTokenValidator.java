@@ -3,14 +3,17 @@ package data.provider.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -18,25 +21,27 @@ import java.util.Optional;
 @Component
 public class JwtTokenValidator {
 
-    private static final int MIN_SECRET_LENGTH = 32;
-    private static final String ERR_SECRET_NULL = "jwt.secret must not be null";
-    private static final String ERR_SECRET_TOO_SHORT = "jwt.secret must be at least 32 characters for HMAC-SHA256.";
+    private static final String RSA_ALGORITHM = "RSA";
+    private static final String ERR_KEY_PATH_NULL = "jwt.public-key-path must not be null";
     private static final String LOG_JWT_PARSE_FAILED = "JWT parsing failed: {}";
 
-    private final String jwtSecret;
-    private SecretKey signingKey;
+    private final String publicKeyPath;
+    private PublicKey signingKey;
 
-    public JwtTokenValidator(@Value("${jwt.secret}") final String jwtSecret) {
-        this.jwtSecret = Objects.requireNonNull(jwtSecret, ERR_SECRET_NULL);
+    public JwtTokenValidator(@Value("${jwt.public-key-path}") final String publicKeyPath) {
+        this.publicKeyPath = Objects.requireNonNull(publicKeyPath, ERR_KEY_PATH_NULL);
     }
 
     @PostConstruct
-    void init() {
-        final byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
-        if (keyBytes.length < MIN_SECRET_LENGTH) {
-            throw new IllegalStateException(ERR_SECRET_TOO_SHORT);
-        }
-        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+    void init() throws Exception {
+        final String pem = Files.readString(Path.of(publicKeyPath));
+        final String base64 = pem
+                .replaceAll("-----BEGIN [A-Z ]+-----", "")
+                .replaceAll("-----END [A-Z ]+-----", "")
+                .replaceAll("\\s", "");
+        final byte[] der = Base64.getDecoder().decode(base64);
+        this.signingKey = KeyFactory.getInstance(RSA_ALGORITHM)
+                .generatePublic(new X509EncodedKeySpec(der));
     }
 
     public Optional<Claims> getClaims(final String token) {

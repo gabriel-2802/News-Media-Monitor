@@ -19,10 +19,11 @@ rabbitmq:
   scrape-jobs-queue: ${SCRAPE_JOBS_QUEUE:scrape.jobs}
   article-notifications-queue: ${ARTICLE_NOTIFICATIONS_QUEUE:article.notifications}
 
-# Must match the manager service's jwt.secret — the provider only validates
-# tokens issued by the manager, it never issues its own.
+# The provider only validates tokens issued by the manager, it never issues
+# its own — it only ever needs the manager's public key, never the private
+# key used to sign them.
 jwt:
-  secret: ${JWT_SECRET:local-dev-jwt-signing-secret-please-change-me}
+  public-key-path: ${JWT_PUBLIC_KEY_PATH:../keys/jwt-public.pem}
 
 springdoc:
   api-docs:
