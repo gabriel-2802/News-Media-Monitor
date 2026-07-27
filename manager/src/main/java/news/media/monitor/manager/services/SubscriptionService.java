@@ -4,6 +4,7 @@ import news.media.monitor.manager.dto.requests.CreateSubscriptionRequest;
 import news.media.monitor.manager.dto.responses.SubscriptionResponse;
 import news.media.monitor.manager.exceptions.exceptions.DuplicateSubscriptionException;
 import news.media.monitor.manager.exceptions.exceptions.ExternalServiceException;
+import news.media.monitor.manager.exceptions.exceptions.InvalidProviderResponseException;
 import news.media.monitor.manager.exceptions.exceptions.ResourceNotFoundException;
 import news.media.monitor.manager.models.Subscription;
 import news.media.monitor.manager.models.SubscriptionType;
@@ -15,6 +16,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
@@ -29,6 +32,7 @@ public class SubscriptionService {
     private static final String TOPIC_NOT_FOUND            = "Topic does not exist: ";
     private static final String STORY_NOT_FOUND            = "Story does not exist: ";
     private static final String NEWS_PROVIDER_UNAVAILABLE  = "News provider service is unavailable";
+    private static final String PROVIDER_INVALID_RESPONSE  = "Provider service did not confirm subscription with 200 OK";
     private static final String SORT_FIELD_CREATED_AT      = "createdAt";
 
     private static final String PATH_SUBSCRIPTIONS_STORY = "/api/subscriptions/story/{targetId}";
@@ -36,6 +40,7 @@ public class SubscriptionService {
 
     private static final String LOG_SUBSCRIBED   = "User {} subscribed to {} '{}'";
     private static final String LOG_UNSUBSCRIBED = "User {} unsubscribed from {} '{}'";
+    private static final String LOG_PROVIDER_RESPONSE = "Provider response status: {} for {} subscription to '{}'";
 
     private static final String PROP_NEWS_PROVIDER_BASE_URL = "${app.news-provider.base-url}";
 
@@ -93,21 +98,74 @@ public class SubscriptionService {
         log.info(LOG_UNSUBSCRIBED, userId, subscription.getType(), subscription.getTargetId());
     }
 
+    /**
+     * Notifies the provider of a new subscription.
+     * Validates that the provider responds with HTTP 200 OK.
+     *
+     * @param type     Subscription type (TOPIC or STORY)
+     * @param targetId Target resource ID
+     * @throws InvalidProviderResponseException if provider does not return 200 OK
+     * @throws ResourceNotFoundException if provider returns 400 (resource not found)
+     * @throws ExternalServiceException if provider is unavailable
+     */
     private void providerSubscribe(SubscriptionType type, String targetId) {
         try {
-            restTemplate.postForEntity(newsProviderBaseUrl + pathFor(type), null, Void.class, targetId);
+            ResponseEntity<Void> response = restTemplate.postForEntity(
+                    newsProviderBaseUrl + pathFor(type),
+                    null,
+                    Void.class,
+                    targetId
+            );
+
+            log.info(LOG_PROVIDER_RESPONSE, response.getStatusCode().value(), type, targetId);
+
+            if (response.getStatusCode() != HttpStatus.OK) {
+                throw new InvalidProviderResponseException(
+                        response.getStatusCode(),
+                        ""
+                );
+            }
         } catch (HttpClientErrorException.BadRequest e) {
             throw new ResourceNotFoundException(notFoundMessage(type, targetId));
+        } catch (InvalidProviderResponseException e) {
+            throw e;
         } catch (RestClientException e) {
             throw new ExternalServiceException(NEWS_PROVIDER_UNAVAILABLE, e);
         }
     }
 
+    /**
+     * Notifies the provider of subscription removal.
+     * Validates that the provider responds with HTTP 200 OK.
+     *
+     * @param type     Subscription type (TOPIC or STORY)
+     * @param targetId Target resource ID
+     * @throws InvalidProviderResponseException if provider does not return 200 OK
+     * @throws ResourceNotFoundException if provider returns 400 (resource not found)
+     * @throws ExternalServiceException if provider is unavailable
+     */
     private void providerUnsubscribe(SubscriptionType type, String targetId) {
         try {
-            restTemplate.delete(newsProviderBaseUrl + pathFor(type), targetId);
+            ResponseEntity<Void> response = restTemplate.exchange(
+                    newsProviderBaseUrl + pathFor(type),
+                    org.springframework.http.HttpMethod.DELETE,
+                    null,
+                    Void.class,
+                    targetId
+            );
+
+            log.info(LOG_PROVIDER_RESPONSE, response.getStatusCode().value(), type, targetId);
+
+            if (response.getStatusCode() != HttpStatus.OK) {
+                throw new InvalidProviderResponseException(
+                        response.getStatusCode(),
+                        ""
+                );
+            }
         } catch (HttpClientErrorException.BadRequest e) {
             throw new ResourceNotFoundException(notFoundMessage(type, targetId));
+        } catch (InvalidProviderResponseException e) {
+            throw e;
         } catch (RestClientException e) {
             throw new ExternalServiceException(NEWS_PROVIDER_UNAVAILABLE, e);
         }
