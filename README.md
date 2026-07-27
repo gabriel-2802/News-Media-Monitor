@@ -113,7 +113,7 @@ Vectors and structured data have different access patterns. Embedding 384-dim ve
 **Authentication Model:**
 
 - Issues three roles: `ROLE_USER` (human users), `ROLE_ADMIN` (human admins), `ROLE_SYSTEM` (services: manager itself, all workers).
-- JWTs are signed with a shared HMAC secret (env var `JWT_SECRET`). Provider validates tokens but never issues them.
+- JWTs are signed with an RSA keypair (`JWT_PRIVATE_KEY_PATH`): manager holds the private key and is the only service that can sign tokens. Provider validates tokens but never issues them, and never has the private key.
 
 ---
 
@@ -151,7 +151,7 @@ Graph structure with four node types and four relationship types:
 
 **Authentication:**
 
-- Only validates JWTs (uses the same secret as manager).
+- Only validates JWTs (holds manager's RSA public key, never its private key — it can verify signatures but can't forge them).
 - All mutating endpoints require `ROLE_ADMIN` or `ROLE_SYSTEM`.
 - All read endpoints are public (no auth required).
 
@@ -223,9 +223,9 @@ Three independent processes, each consuming from one RabbitMQ queue, calling the
 
 ## Authentication
 
-### Three Roles, One Secret
+### Three Roles, One Keypair
 
-All three services share a single HMAC-SHA256 secret (`JWT_SECRET` env var):
+All three services key off a single RSA keypair (`keys/jwt-private.pem` / `keys/jwt-public.pem`, signed with RS256). Manager holds both `JWT_PRIVATE_KEY_PATH` and `JWT_PUBLIC_KEY_PATH` — it signs tokens and also validates its own incoming requests. Provider holds only `JWT_PUBLIC_KEY_PATH`: it can verify a manager-issued signature but has no way to produce one itself.
 
 | Role            | Who                                     | Issued by                                                      | Token has                                               |
 | --------------- | --------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------- |
@@ -235,14 +235,14 @@ All three services share a single HMAC-SHA256 secret (`JWT_SECRET` env var):
 
 **Manager** (only issuer):
 
-- Generates JWTs on demand.
+- Generates JWTs on demand, signed with the RSA private key.
 - Manager itself gets one `ROLE_SYSTEM` token at boot for outbound calls to provider.
 - Each worker process gets its own `ROLE_SYSTEM` token at startup.
 
 **Provider** (validator only):
 
-- Never issues tokens.
-- On every request, validates the signature against `JWT_SECRET`.
+- Never issues tokens - never even loads the private key.
+- On every request, verifies the signature against manager's RSA public key.
 - Reads `roles` and `subject` claims straight from the token; no user profile lookup.
 
 **Workers** (pure clients):
@@ -251,12 +251,12 @@ All three services share a single HMAC-SHA256 secret (`JWT_SECRET` env var):
 - Cache the token on their `requests.Session`.
 - On any `401` response from provider (token expired), re-authenticate and retry once.
 
-### Failure Mode: Drifted Secrets
+### Failure Mode: Mismatched Keys
 
-If `JWT_SECRET` differs between manager and provider:
+If provider's public key doesn't correspond to manager's private key (stale copy, or the pair was regenerated on one side only):
 
-- Manager's own login endpoints (`/api/auth/*`) work fine (only manager validates its own tokens).
-- Provider rejects every call from manager or any worker with `401 Unauthorized` (signature check fails).
+- Manager's own login endpoints (`/api/auth/*`) work fine (only manager validates its own tokens, with its own key).
+- Provider rejects every call from manager or any worker with `401 Unauthorized` (signature verification fails).
 - Silent from the outside - manager looks healthy, but data operations silently fail.
 
 ---
@@ -610,9 +610,9 @@ Any other exception is logged and the message is nacked for requeue; worker keep
 
 ## Authentication & Authorization Model
 
-### Three Roles, One Signing Secret
+### Three Roles, One Keypair
 
-All three services share a single HMAC-SHA256 secret (`JWT_SECRET` env var). Manager is the sole issuer; provider only validates.
+All three services key off a single RSA keypair (`keys/jwt-private.pem` / `keys/jwt-public.pem`, RS256). Manager is the sole issuer and holds both keys; provider only validates and holds just the public key.
 
 | Role            | Who                                    | Issued by                                                      | Contains                                               |
 | --------------- | -------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------ |
@@ -620,7 +620,7 @@ All three services share a single HMAC-SHA256 secret (`JWT_SECRET` env var). Man
 | `ROLE_ADMIN`  | Human admins                           | Manager`/api/auth/login` (email+password + valid admin code) | email, user ID, roles claim                            |
 | `ROLE_SYSTEM` | Services: manager itself + all workers | Manager`/api/auth/login` with `systemCode` (no password)   | no user identity; subject = literal string`"system"` |
 
-**Manager's bootstrap:** On startup, `SystemTokenProvider` generates one `ROLE_SYSTEM` token directly (not via HTTP). Stamped onto all outbound calls to provider via `RestTemplate` interceptor.
+**Manager's bootstrap:** On startup, `SystemTokenProvider` generates one `ROLE_SYSTEM` token directly (not via HTTP), signed with the RSA private key loaded from `JWT_PRIVATE_KEY_PATH`. Stamped onto all outbound calls to provider via `RestTemplate` interceptor.
 
 **Each worker's bootstrap:** `ProviderClient` calls manager `/api/auth/login` with `{"systemCode": "..."}`, caches token on `requests.Session`, re-authenticates transparently on `401` response.
 
@@ -639,12 +639,12 @@ All three services share a single HMAC-SHA256 secret (`JWT_SECRET` env var). Man
 - All `GET` - public (no token required).
 - All `POST`/`PUT`/`PATCH`/`DELETE` - `ROLE_ADMIN` or `ROLE_SYSTEM` (varies by endpoint).
 
-### Failure Mode: Drifted Secrets
+### Failure Mode: Mismatched Keys
 
-If `JWT_SECRET` differs between manager and provider:
+If provider's public key (`JWT_PUBLIC_KEY_PATH`) doesn't match manager's private key:
 
 - Manager's own login/register work fine.
-- Every call from manager or worker to provider fails `401 Unauthorized` (signature validation fails).
+- Every call from manager or worker to provider fails `401 Unauthorized` (signature verification fails).
 - Silent from outside - manager looks healthy, but data operations fail silently.
 
 ---
