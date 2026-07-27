@@ -4,4 +4,6 @@
 **/.mypy_cache/
 workers/clusterer/data/
 .vscode/
+.claude/
+.github/
 .DS_Store
