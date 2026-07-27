@@ -16,17 +16,27 @@ off the same fan-out) rather than competing with it for the same messages
 For each message:
   - Fetches the article's body text from the Provider.
   - Embeds it (see embedder.py).
-  - Queries `story_centroids` for the nearest centroid updated within
-    RECENCY_WINDOW_DAYS.
-  - If the best match's score >= SIMILARITY_THRESHOLD, attaches the
-    article to that Story (Provider) and updates its centroid as a
-    running average (Qdrant).
-  - Otherwise creates a new Story (Provider — this is the one place the
-    Provider write has to happen *before* the Qdrant write, since Story
-    IDs are server-generated and there's no way to seed a centroid point
-    under an ID that doesn't exist yet) and seeds its centroid.
-  - No candidates (bootstrap / first article ever) falls into the same
-    below-threshold branch — no special-casing needed.
+  - Under a single global Redis lock (see handle()) — because the decision
+    below isn't just "update an existing story's centroid," it's "does a
+    matching story exist at all," and two clusterer instances running that
+    check concurrently for two articles of the same brand-new story would
+    otherwise both decide "no match" and create duplicate stories:
+      - Queries `story_centroids` for the nearest centroid updated within
+        RECENCY_WINDOW_DAYS.
+      - If the best match's score >= SIMILARITY_THRESHOLD, attaches the
+        article to that Story (Provider) and updates its centroid as a
+        running average (Qdrant).
+      - Otherwise creates a new Story (Provider — this is the one place
+        the Provider write has to happen *before* the Qdrant write, since
+        Story IDs are server-generated and there's no way to seed a
+        centroid point under an ID that doesn't exist yet) and seeds its
+        centroid.
+      - No candidates (bootstrap / first article ever) falls into the
+        same below-threshold branch — no special-casing needed.
+  - The embedding step above — the CPU/GPU-bound cost that's the actual
+    reason to run more than one clusterer instance — happens *before* the
+    lock is acquired, so it stays fully parallel across instances; only
+    the comparatively cheap decide-and-write step is serialized.
 
 Message format (JSON), published by worker.py:
     {
@@ -43,6 +53,9 @@ Environment variables:
     PROVIDER_URL      http://host:port
     QDRANT_URL        https://<cluster-id>.<region>.gcp.cloud.qdrant.io
     QDRANT_API_KEY    Qdrant Cloud API key
+    REDIS_URL         redis://[:password@]host:port/db — global clustering
+                      decision lock, only matters once more than one
+                      clusterer runs
 """
 from __future__ import annotations
 
@@ -55,6 +68,7 @@ import pika
 import pika.channel
 import pika.exceptions
 import pika.spec
+import redis
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     DatetimeRange,
@@ -99,6 +113,13 @@ RECENCY_WINDOW_DAYS = require_int("RECENCY_WINDOW_DAYS")
 # see validate.py, where this was found live.
 _MAX_EMBED_CHARS = require_int("MAX_EMBED_CHARS")
 
+# Global lock around the whole "find a candidate, then attach-or-create"
+# decision (see handle()). Only matters once more than one clusterer
+# instance runs — see "Scaling Considerations" in the README.
+CLUSTER_DECISION_LOCK_KEY = "clusterer:decision-lock"
+CLUSTER_LOCK_TIMEOUT_SECONDS = require_int("CLUSTER_LOCK_TIMEOUT_SECONDS")
+CLUSTER_LOCK_BLOCKING_TIMEOUT_SECONDS = require_int("CLUSTER_LOCK_BLOCKING_TIMEOUT_SECONDS")
+
 configure_logging()
 log = logging.getLogger(__name__)
 
@@ -142,9 +163,10 @@ def ensure_collection(qdrant: QdrantClient) -> None:
 
 
 class ClusteringHandler:
-    def __init__(self, provider: ProviderClient, qdrant: QdrantClient) -> None:
+    def __init__(self, provider: ProviderClient, qdrant: QdrantClient, redis_client: redis.Redis) -> None:
         self._provider = provider
         self._qdrant = qdrant
+        self._redis = redis_client
         # Triggers model load on first use, not at import time — keeps
         # worker startup fast if this ever gets imported without immediately
         # running (e.g. tests).
@@ -165,13 +187,36 @@ class ClusteringHandler:
             channel.basic_ack(delivery_tag=method.delivery_tag)
             return
 
+        # Embedding is the CPU/GPU-bound step (the reason to run more than
+        # one clusterer instance in the first place), so it happens before
+        # the lock and stays fully parallel across instances.
         vector = _embed_article(self._embedder, article.title, article.body_text)
-        best_hit = self._find_best_candidate(vector)
 
-        if best_hit is not None and best_hit.score >= SIMILARITY_THRESHOLD:
-            self._attach_to_existing(best_hit, vector, url)
-        else:
-            self._create_and_attach(article.title, vector, url)
+        # Everything from here down — "does a matching story exist, and
+        # act on that" — must run as one atomic decision. Without this
+        # lock, two instances processing two articles of the same
+        # brand-new story at nearly the same time could both find no
+        # candidate and both create a story, permanently splitting one
+        # real story into two. Only matters once >1 clusterer runs.
+        lock = self._redis.lock(
+            CLUSTER_DECISION_LOCK_KEY,
+            timeout=CLUSTER_LOCK_TIMEOUT_SECONDS,
+            blocking_timeout=CLUSTER_LOCK_BLOCKING_TIMEOUT_SECONDS,
+        )
+        if not lock.acquire():
+            raise TimeoutError(
+                f"Could not acquire clustering decision lock within "
+                f"{CLUSTER_LOCK_BLOCKING_TIMEOUT_SECONDS}s"
+            )
+        try:
+            best_hit = self._find_best_candidate(vector)
+
+            if best_hit is not None and best_hit.score >= SIMILARITY_THRESHOLD:
+                self._attach_to_existing(best_hit, vector, url)
+            else:
+                self._create_and_attach(article.title, vector, url)
+        finally:
+            lock.release()
 
         channel.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -187,6 +232,10 @@ class ClusteringHandler:
         return hits[0] if hits else None
 
     def _attach_to_existing(self, hit: Any, vector: list[float], url: str) -> None:
+        # Called only from within handle()'s CLUSTER_DECISION_LOCK_KEY
+        # critical section, so `hit` (read a moment ago, inside the same
+        # lock) can be trusted — no other clusterer instance can have
+        # mutated this centroid in between.
         story_id = hit.payload["storyId"]
 
         # Vector DB first per the consistency strategy (idempotent upsert
@@ -258,11 +307,13 @@ class Worker:
         provider_url: str = PROVIDER_URL,
         qdrant_url: Optional[str] = None,
         qdrant_api_key: Optional[str] = None,
+        redis_url: Optional[str] = None,
     ) -> None:
         self._rabbitmq_url = rabbitmq_url
         self._provider_url = provider_url
         self._qdrant_url = qdrant_url or require_env("QDRANT_URL")
         self._qdrant_api_key = qdrant_api_key or require_env("QDRANT_API_KEY")
+        self._redis_url = redis_url or require_env("REDIS_URL")
 
     def run(self) -> None:
         provider = ProviderClient(self._provider_url)
@@ -272,9 +323,10 @@ class Worker:
             check_compatibility=False,
         )
         ensure_collection(qdrant)
+        redis_client = redis.Redis.from_url(self._redis_url)
 
         log.info("Loading embedding model…")
-        handler = ClusteringHandler(provider, qdrant)
+        handler = ClusteringHandler(provider, qdrant, redis_client)
         log.info("Model loaded.")
 
         log.info("Connecting to RabbitMQ → %s", self._rabbitmq_url)

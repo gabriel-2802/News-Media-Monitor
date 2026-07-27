@@ -277,13 +277,28 @@ make scrape-worker &
 make classify-worker &
 make classify-worker &
 
-# Run 1 clusterer instance (Qdrant centroid updates must be serialized per story to avoid race conditions)
+# Run multiple clusterer instances (safe — see "Clusterer Locking" below)
+make cluster-worker &
 make cluster-worker &
 ```
 
 RabbitMQ automatically distributes messages among consumers. Scraper instances share the load of all `scrape.jobs`. Classifier instances handle `article.classify` in parallel.
 
-**Note:** The clusterer is more delicate. Updating Qdrant centroids from multiple workers concurrently can cause centroid drift (two workers both read the old centroid, update it independently, and write back a stale value). Current code doesn't guard against this-for now, run 1 clusterer. Qdrant locks could be added if concurrent clustering becomes necessary.
+### Clusterer Locking (Redis)
+
+Two related races show up once more than one clusterer instance runs, both because "does a matching story exist" and "update its centroid" are read-modify-write decisions against shared state (Qdrant + Neo4j), not atomic operations:
+
+1. **Centroid drift:** two instances both match the same existing story for two different articles at nearly the same moment, both read the same `articleCount`/vector, and both write. She second upsert silently overwrites the first, losing that article's contribution to the centroid.
+2. **Duplicate stories:** two instances both process an article for the same brand-new story at nearly the same moment, both find no existing candidate above `SIMILARITY_THRESHOLD` (because neither has written a centroid yet), and both create a separate Story for what should have been one, permanently splitting it. This one is harder to fix with a per-story lock, since there's no story ID to lock on until one of the racing workers has already created it.
+
+**Fix:** a single global lock, held in `handle()` around the whole "query for a candidate, then attach-or-create" decision (`workers/clusterer/clusterer_worker.py`), backed by Redis:
+
+- Keyed by one fixed name, `clusterer:decision-lock` (not per-story, the point is to serialize the *decision* itself, including the "no candidate exists" case), acquired via `redis-py`'s built-in `Redis.lock(...)` (a `SET NX PX`-based mutex with safe, token-checked release — a worker can never release a lock it doesn't hold).
+- `CLUSTER_LOCK_TIMEOUT_SECONDS` (default 30) : the lock's own TTL, so a clusterer that crashes mid-decision doesn't leave every future clustering decision permanently blocked; it self-expires and the next attempt can acquire it.
+- `CLUSTER_LOCK_BLOCKING_TIMEOUT_SECONDS` (default 15) : how long a waiting instance blocks trying to acquire before giving up; on timeout the handler raises, the message is nacked and requeued (same path as any other processing failure), and whichever instance is free next picks it up.
+- The embedding step (the CPU/GPU-bound cost that's the actual reason to run more than one instance) happens *before* the lock is acquired, so it stays fully parallel : only the comparatively cheap "find candidate + attach-or-create" step is serialized across all instances.
+
+Why Redis and not something already in the stack (e.g. Neo4j): a real mutex needs an atomic acquire-or-fail primitive with expiry, which is exactly what Redis's `SET NX PX` gives for free. Emulating it in Neo4j means abusing transactional side effects as a lock and hand-rolling the TTL/crash-recovery logic Redis provides natively — more moving parts for a less obvious guarantee.
 
 ## Message Queue Topology: RabbitMQ
 
@@ -569,6 +584,8 @@ Any other exception is logged and the message is nacked for requeue; worker keep
 - `RECENCY_WINDOW_DAYS` - how far back to look (5 days).
 - `MAX_EMBED_CHARS` - input truncation (4000 chars).
 - `CENTROID_COLLECTION` - collection name (`story_centroids`).
+- `REDIS_URL` - global clustering decision lock backend (see "Clusterer Locking" under Scaling Considerations).
+- `CLUSTER_LOCK_TIMEOUT_SECONDS` / `CLUSTER_LOCK_BLOCKING_TIMEOUT_SECONDS` - lock TTL and acquire-wait timeout.
 
 ### Clustering Validation Report
 

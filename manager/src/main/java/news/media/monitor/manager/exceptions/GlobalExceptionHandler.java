@@ -32,6 +32,7 @@ public class GlobalExceptionHandler {
     private static final String SLUG_INTERNAL_ERROR       = "internal-error";
     private static final String SLUG_DUPLICATE_SUBSCRIPTION = "duplicate-subscription";
     private static final String SLUG_EXTERNAL_SERVICE     = "external-service-error";
+    private static final String SLUG_INVALID_PROVIDER_RESPONSE = "invalid-provider-response";
 
     private static final String KEY_TIMESTAMP             = "timestamp";
     private static final String KEY_ERRORS                = "errors";
@@ -51,6 +52,7 @@ public class GlobalExceptionHandler {
     private static final String LOG_UNHANDLED_EXCEPTION   = "Unhandled exception";
     private static final String LOG_DUPLICATE_SUBSCRIPTION = "Duplicate subscription: {}";
     private static final String LOG_EXTERNAL_SERVICE      = "External service call failed: {}";
+    private static final String LOG_INVALID_PROVIDER_RESPONSE = "Provider service returned invalid HTTP status: {} {}";
 
     @ExceptionHandler(DuplicateEmailException.class)
     public ProblemDetail handleDuplicateEmail(DuplicateEmailException ex) {
@@ -82,10 +84,16 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.BAD_GATEWAY, ex.getMessage(), SLUG_EXTERNAL_SERVICE);
     }
 
+    @ExceptionHandler(InvalidProviderResponseException.class)
+    public ProblemDetail handleInvalidProviderResponse(InvalidProviderResponseException ex) {
+        log.error(LOG_INVALID_PROVIDER_RESPONSE, ex.getStatusCode(), ex.getMessage());
+        return problem(HttpStatus.BAD_GATEWAY, ex.getMessage(), SLUG_INVALID_PROVIDER_RESPONSE);
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
         log.warn(LOG_ACCESS_DENIED, ex.getMessage());
-        return problem(HttpStatus.FORBIDDEN, MSG_ACCESS_DENIED, SLUG_ACCESS_DENIED);
+        return problem(HttpStatus.FORBIDDEN, "Access denied", SLUG_ACCESS_DENIED);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
