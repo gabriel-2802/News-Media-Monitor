@@ -1,0 +1,40 @@
+server:
+  servlet:
+    context-path: /news-provider
+
+spring:
+  application:
+    name: news-provider
+  neo4j:
+    uri: bolt://localhost:7687
+    authentication:
+      username: neo4j
+      password: secretsecret
+  data:
+    neo4j:
+      database: neo4j
+
+rabbitmq:
+  url: ${RABBITMQ_URL:amqp://admin:secret@localhost:5672/news_monitor}
+  scrape-jobs-queue: ${SCRAPE_JOBS_QUEUE:scrape.jobs}
+  article-notifications-queue: ${ARTICLE_NOTIFICATIONS_QUEUE:article.notifications}
+
+# The provider only validates tokens issued by the manager, it never issues
+# its own — it only ever needs the manager's public key, never the private
+# key used to sign them.
+jwt:
+  public-key-path: ${JWT_PUBLIC_KEY_PATH:../keys/jwt-public.pem}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+
+logging:
+  level:
+    data:
+      provider:
+        util=DEBUG:

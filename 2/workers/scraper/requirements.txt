@@ -1,0 +1,9 @@
+requests
+beautifulsoup4
+lxml
+trafilatura
+python-dateutil
+playwright
+pika
+python-dotenv
+urllib3<2

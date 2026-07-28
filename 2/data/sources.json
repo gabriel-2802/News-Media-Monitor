@@ -1,0 +1,224 @@
+{
+    "name": "guardian",
+    "baseUrl": "https://www.theguardian.com",
+    "rssUrl": "https://www.theguardian.com/world/rss",
+    "politicalView": "Left",
+    "biasScores": {
+      "allsides": "Left (-3.5), moved from Lean Left (-2.4) after Nov. 2024 editorial review",
+      "mbfc": "Left-Center to Left (editorial voice: self-described as 'centre-left' since 2004)"
+    },
+    "notes": "AllSides' panel cited 'strong Left word choice bias, slant, story choice bias, sensationalism.' The Guardian itself has acknowledged a centre-left editorial identity.",
+    "sources": [
+      "https://www.allsides.com/news-source/Guardian",
+      "https://www.allsides.com/blog/associated-press-guardian-bias-ratings-moved-lean-left-left"
+    ]
+  },
+  {
+    "name": "aljazeera",
+    "baseUrl": "https://www.aljazeera.com",
+    "rssUrl": "https://www.aljazeera.com/xml/rss/all.xml",
+    "politicalView": "Lean Left (with Qatar state-funding/editorial-influence caveat)",
+    "biasScores": {
+      "allsides": "Lean Left (independent review Sept. 2019, reaffirmed June 2022)",
+      "mbfc": "Mixed factual reporting rating, citing 'misleading extreme editorial bias that favors Qatar'"
+    },
+    "notes": "Al Jazeera is funded by the government of Qatar; AllSides and MBFC both flag this as relevant context distinct from left/right lean. AllSides found emotionalism, slant, and bias by omission of right-leaning perspectives.",
+    "sources": [
+      "https://www.allsides.com/news-source/al-jazeera-media-bias",
+      "https://www.influencewatch.org/organization/al-jazeera/"
+    ]
+  },
+  {
+    "name": "npr",
+    "baseUrl": "https://www.npr.org",
+    "rssUrl": "https://feeds.npr.org/1001/rss.xml",
+    "politicalView": "Lean Left",
+    "biasScores": {
+      "allsides": "Lean Left (-1.88 in May 2025 blind survey; moved from Center in Feb. 2022)",
+      "mbfc": "Left-Center (-2.8), High factual reporting",
+      "ad_fontes": "Middle / neutral-balanced (website specifically)"
+    },
+    "notes": "Rating applies to NPR's online written content only (not radio). NPR's fact-check section and opinion content are separately rated Lean Left by AllSides.",
+    "sources": [
+      "https://www.allsides.com/news-source/npr-media-bias",
+      "https://mediabiasfactcheck.com/npr/"
+    ]
+  },
+  {
+    "name": "dw",
+    "baseUrl": "https://www.dw.com",
+    "rssUrl": "https://rss.dw.com/rdf/rss-en-all",
+    "politicalView": "Center / Lean Left",
+    "biasScores": {
+      "allsides": "Center",
+      "mbfc": "Left-Center (-2.5), High factual reporting",
+      "ad_fontes": "Center"
+    },
+    "notes": "Deutsche Welle is Germany's state-funded international broadcaster. Ground News' aggregate of AllSides+MBFC+Ad Fontes lands on Center; MBFC alone rates it Left-Center.",
+    "sources": [
+      "https://mediabiasfactcheck.com/dw-news/",
+      "https://www.allsides.com/news-source/deutsche-welle-media-bias",
+      "https://ground.news/interest/deutsche-welle"
+    ]
+  },
+  {
+    "name": "france24",
+    "baseUrl": "https://www.france24.com",
+    "rssUrl": "https://www.france24.com/en/rss",
+    "politicalView": "Center (slight left lean in story selection)",
+    "biasScores": {
+      "mbfc": "Least Biased (-1.75), High factual reporting",
+      "biasly": "Somewhat Left (-16%)"
+    },
+    "notes": "France 24 is owned by French state holding company France Médias Monde. MBFC notes it has no op-ed page and 'story selection very slightly favors the left.' AllSides has not formally rated it (Not Rated).",
+    "sources": [
+      "https://mediabiasfactcheck.com/france24/",
+      "https://www.biasly.com/sources/france-24-media-bias/",
+      "https://www.allsides.com/news-source/france-24-media-bias"
+    ]
+  },
+  {
+    "name": "cbc",
+    "baseUrl": "https://www.cbc.ca",
+    "rssUrl": "https://www.cbc.ca/cmlink/rss-world",
+    "rss_browser_ua": true,
+    "politicalView": "Lean Left",
+    "biasScores": {
+      "allsides": "Lean Left (July 2022 small-group editorial review)",
+      "mbfc": "Left-Center (-3.3), High factual reporting",
+      "biasly": "Somewhat Left (-32%)"
+    },
+    "notes": "AllSides panelists agreed CBC's straight reporting is largely neutral/fact-based but found a Lean Left stance specifically on coverage of social issues, plus left-leaning word choice and bias by omission.",
+    "sources": [
+      "https://mediabiasfactcheck.com/cbc-news-canadian-broadcasting/",
+      "https://www.allsides.com/news-source/cbc-news-media-bias"
+    ]
+  },
+  {
+    "name": "abc_au",
+    "baseUrl": "https://www.abc.net.au",
+    "rssUrl": "https://www.abc.net.au/news/feed/51120/rss.xml",
+    "politicalView": "Lean Left",
+    "biasScores": {
+      "mbfc": "Left-Center (-2.8), High factual reporting",
+      "ground_news_aggregate": "Lean Left"
+    },
+    "notes": "Australia's publicly-funded national broadcaster. MBFC: 'story selection that moderately favors the left,' while rating factual reporting High and noting it as a certified IFCN-style fact-checker.",
+    "sources": [
+      "https://mediabiasfactcheck.com/abc-news-australia/",
+      "https://ground.news/interest/abc-australia",
+      "https://factually.co/fact-checks/media/australian-broadcasting-corporation-bias-a2ad2e"
+    ]
+  },
+  {
+    "name": "euronews",
+    "baseUrl": "https://www.euronews.com",
+    "rssUrl": "https://www.euronews.com/rss",
+    "politicalView": "Center / Lean Left",
+    "biasScores": {
+      "allsides": "Center (May 2024 independent review, low confidence)",
+      "mbfc": "Left-Center (-2.5), Mostly Factual"
+    },
+    "notes": "MBFC: 'well-sourced neutral news reporting and a moderate left lean in editorial content.' Also flags sponsored/paid content from foreign governments (Qatar, Saudi Arabia, UAE, Azerbaijan) as a factuality caveat unrelated to left/right lean.",
+    "sources": [
+      "https://mediabiasfactcheck.com/euronews/",
+      "https://www.allsides.com/news-source/euronews-media-bias"
+    ]
+  },
+  {
+    "name": "sky",
+    "baseUrl": "https://news.sky.com",
+    "rssUrl": "https://feeds.skynews.com/feeds/rss/world.xml",
+    "politicalView": "Center",
+    "biasScores": {
+      "mbfc": "Least Biased (1.0), High factual reporting",
+      "ad_fontes": "Middle, Reliable",
+      "allsides": "Lean Left (low-confidence rating, differs from MBFC/Ad Fontes)"
+    },
+    "notes": "Owned by Comcast/Sky UK. MBFC and Ad Fontes both place Sky News UK near dead-center with high reliability; AllSides' Lean Left rating is explicitly flagged by AllSides itself as low-confidence, so the stronger consensus (MBFC + Ad Fontes) is Center.",
+    "sources": [
+      "https://mediabiasfactcheck.com/sky-news/",
+      "https://adfontesmedia.com/sky-news-bias-and-reliability/",
+      "https://www.allsides.com/news-source/sky-news-media-bias"
+    ]
+  },
+  {
+    "name": "independent",
+    "baseUrl": "https://www.independent.co.uk",
+    "rssUrl": "https://www.independent.co.uk/news/world/rss",
+    "politicalView": "Lean Left",
+    "biasScores": {
+      "allsides": "Lean Left",
+      "mbfc": "Left-Center (-3.6), Mixed factual reporting"
+    },
+    "notes": "MBFC: 'story selection that moderately favors the left'; factual reporting rated Mixed due to several failed fact checks (high volume of published content is cited as a mitigating factor).",
+    "sources": [
+      "https://mediabiasfactcheck.com/the-independent/",
+      "https://www.allsides.com/news-source/independent-media-bias"
+    ]
+  },
+  {
+    "name": "thehill",
+    "baseUrl": "https://thehill.com",
+    "rssUrl": "https://thehill.com/feed",
+    "politicalView": "Center",
+    "biasScores": {
+      "allsides": "Center (-0.66, April 2026 editorial review; -0.76 in May 2022 blind survey)"
+    },
+    "notes": "AllSides briefly moved The Hill to Lean Left in a March 2026 review, then reverted to Center after a follow-up review the same month found 'mixed consensus.' Consistently close to the Center/Lean-Left border across years of surveys.",
+    "sources": [
+      "https://www.allsides.com/news-source/hill-media-bias",
+      "https://www.allsides.com/blog/hills-bias-rated-center-may-2022-allsides-blind-bias-survey"
+    ]
+  },
+  {
+    "name": "vox",
+    "baseUrl": "https://www.vox.com",
+    "rssUrl": "https://www.vox.com/rss/index.xml",
+    "politicalView": "Left",
+    "biasScores": {
+      "allsides": "Left (Aug 2023 blind survey and Apr 2022 independent review both confirmed Left)",
+      "mbfc": "Left (-6.4), High factual reporting",
+      "ad_fontes": "Skews Left",
+      "biasly": "Medium Left (-46%)"
+    },
+    "notes": "One of the most consistently and strongly left-rated outlets in this list across all four raters. MBFC: 'editorial positions and story selection that routinely favors the left,' while still rating factual reporting High.",
+    "sources": [
+      "https://mediabiasfactcheck.com/vox/",
+      "https://www.allsides.com/news-source/vox-media-bias",
+      "https://adfontesmedia.com/vox-bias-and-reliability/"
+    ]
+  },
+  {
+    "name": "time",
+    "baseUrl": "https://time.com",
+    "rssUrl": "https://time.com/feed",
+    "politicalView": "Lean Left",
+    "biasScores": {
+      "allsides": "Lean Left (moved from Left to Lean Left after Sept. 2018 editorial review; reconfirmed May 2023)",
+      "mbfc": "Left-Center (-4.0, near the Left/Left-Center boundary), High factual reporting",
+      "ad_fontes": "Skews Left"
+    },
+    "notes": "AllSides noted TIME's news pieces are 'narrative-based' with frequent 'puff pieces favorable to Democrats,' though less sensationalist than outlets it rates as Left.",
+    "sources": [
+      "https://www.allsides.com/news-source/time-magazine-news-media-bias",
+      "https://mediabiasfactcheck.com/time/"
+    ]
+  },
+  {
+    "name": "rt",
+    "baseUrl": "https://www.rt.com",
+    "rssUrl": "https://www.rt.com/rss/news",
+    "politicalView": "Right-leaning / Russian state propaganda outlet (bias framework applies imperfectly)",
+    "biasScores": {
+      "allsides": "Lean Right (initial team review; low confidence)",
+      "mbfc": "Right-Center bias score (4.70) but classified overall as 'Questionable' due to propaganda and very low factual reporting",
+      "ad_fontes": "Skews Right, Mixed reliability"
+    },
+    "notes": "RT is wholly funded and controlled by the Russian government (registered as a 'foreign agent' by the US DOJ in 2017). All three raters flag it as a special case: AllSides notes RT's positioning reflects 'whatever ... best reflects the views of the current Russian government' rather than conventional US left/right politics, and MBFC's overriding classification is 'Questionable' (propaganda/conspiracy/fake news risk) rather than a standard left-right label.",
+    "sources": [
+      "https://www.allsides.com/news-source/rt",
+      "https://mediabiasfactcheck.com/rt-news/",
+      "https://adfontesmedia.com/rt-bias-and-reliability/"
+    ]
+  }
