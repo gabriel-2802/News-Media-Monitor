@@ -1,0 +1,71 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16
+    container_name: news_monitor_db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: news_monitor_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  ai_service:
+    build:
+      context: ./ai_models
+      dockerfile: Dockerfile
+    container_name: ai_service
+    ports:
+      - "8002:8000"
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: admin
+      DB_PASSWORD: admin
+      DB_NAME: news_monitor_db
+    volumes:
+      - ./ai_models:/app
+
+  rss_worker:
+    build:
+      context: ./rss
+      dockerfile: Dockerfile
+    deploy:
+      replicas: 1
+    hostname: "rss-{{.Task.Slot}}"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/news_monitor_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      WORKER_INDEX: "{{.Task.Slot}}"
+      WORKER_COUNT: 1
+    networks:
+      - internal
+
+  spring_app:
+    build:
+      context: ./demo
+      dockerfile: Dockerfile
+    container_name: spring_app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+      - ai_service
+      - rss_worker
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/news_monitor_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      AI_SERVICE_URL: http://ai_service:8000
+
+
+volumes:
+  postgres-data:

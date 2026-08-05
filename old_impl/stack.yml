@@ -1,0 +1,115 @@
+version: "3.8"
+
+configs:
+  prometheus_config:
+    file: ./prometheus.yml
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+    volumes:
+      - prometheus-data:/prometheus
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: news_monitor_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - internal
+    deploy:
+      restart_policy:
+        condition: on-failure
+
+  ai_service:
+    image: ai_service:latest
+    ports:
+      - "8002:8000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: admin
+      DB_PASSWORD: admin
+      DB_NAME: news_monitor_db
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  rss_worker:
+    image: rss_worker:latest
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/news_monitor_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      WORKER_INDEX: "{{.Task.Slot}}"
+      WORKER_COUNT: 3
+      CLASSIFICATION_API_URL: http://ai_service:8000/classify
+      CLUSTERING_API_URL: http://ai_service:8000/cluster
+    networks:
+      - internal
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+
+  spring_app:
+    image: spring_app:latest
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/news_monitor_db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      AI_SERVICE_URL: http://ai_service:8000
+    networks:
+      - internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  internal:
+    driver: overlay
