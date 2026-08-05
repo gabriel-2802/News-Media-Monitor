@@ -10,3 +10,4 @@ workers/clusterer/data/
 **/*.safetensors
 frontend/
 plan.md
+workers/classifier/cls_model_output/
