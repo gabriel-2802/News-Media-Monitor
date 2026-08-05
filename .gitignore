@@ -7,4 +7,6 @@ workers/clusterer/data/
 .claude/
 .github/
 .DS_Store
-*.safetensors
+**/*.safetensors
+frontend/
+plan.md
