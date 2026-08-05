@@ -1,4 +1,5 @@
 server:
+  port: ${SERVER_PORT:8080}
   servlet:
     context-path: /news-provider
 
@@ -6,13 +7,13 @@ spring:
   application:
     name: news-provider
   neo4j:
-    uri: bolt://localhost:7687
+    uri: ${NEO4J_URI:bolt://localhost:7687}
     authentication:
-      username: neo4j
-      password: secretsecret
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:secretsecret}
   data:
     neo4j:
-      database: neo4j
+      database: ${NEO4J_DATABASE:neo4j}
 
 rabbitmq:
   url: ${RABBITMQ_URL:amqp://admin:secret@localhost:5672/news_monitor}

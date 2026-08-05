@@ -1,12 +1,26 @@
+name: news-mm
+
 services:
+  # ── Infrastructure (always started by `docker compose up` / `make up`) ──
+  # No `profiles:` on these — they must keep starting by default so the
+  # existing "run manager/provider/workers manually against Dockerized
+  # infra" workflow keeps working unchanged.
+
   neo4j:
-    image: neo4j:5.26
-    container_name: news_monitor_neo4j
+    build:
+      context: ./neo4j
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "${NEO4J_HTTP_PORT:-7474}:7474"
       - "${NEO4J_BOLT_PORT:-7687}:7687"
     environment:
+      # The official image treats every NEO4J_* env var as a neo4j.conf
+      # setting override (that's how NEO4J_AUTH itself works) — do NOT add
+      # another NEO4J_* var here (e.g. NEO4J_PASSWORD) to hand the password
+      # to migrate.sh, it'll be misread as an invalid config key and the
+      # server will refuse to start under strict validation. The password
+      # is derived from NEO4J_AUTH inside entrypoint-wrapper.sh instead.
       NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:-secret}"
     volumes:
       - neo4j_data:/data
@@ -25,7 +39,6 @@ services:
     build:
       context: ./rabbitmq
       dockerfile: Dockerfile
-    container_name: news_monitor_rabbitmq
     restart: unless-stopped
     ports:
       - "${RABBITMQ_AMQP_PORT:-5672}:5672"
@@ -46,7 +59,6 @@ services:
 
   postgres:
     image: postgres:17-alpine
-    container_name: news_monitor_postgres
     restart: unless-stopped
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -65,7 +77,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: news_monitor_redis
     restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -78,6 +89,141 @@ services:
       timeout: 10s
       retries: 10
       start_period: 20s
+
+  # ── Apps (only started with `--profile apps`, e.g. `make up-full`) ──
+  # Kept out of the default `up` so the old manual-deploy workflow (run
+  # these yourself, against the infra above) is unaffected.
+
+  manager:
+    build:
+      context: ./manager
+      dockerfile: Dockerfile
+    profiles: ["apps"]
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    env_file: .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: "${POSTGRES_DB:-news_monitor}"
+      DB_USERNAME: "${POSTGRES_USER:-postgres}"
+      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:-secret}"
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-secret}@rabbitmq:5672/news_monitor"
+      APP_NEWS_PROVIDER_BASE_URL: http://provider:8080/news-provider
+      JWT_PRIVATE_KEY_PATH: /keys/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /keys/jwt-public.pem
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/manager/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+
+  provider:
+    build:
+      context: ./provider
+      dockerfile: Dockerfile
+    profiles: ["apps"]
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file: .env
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: "${NEO4J_PASSWORD:-secret}"
+      NEO4J_DATABASE: neo4j
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-secret}@rabbitmq:5672/news_monitor"
+      JWT_PUBLIC_KEY_PATH: /keys/jwt-public.pem
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/news-provider/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+
+  scraper-worker:
+    build:
+      context: ./workers
+      dockerfile: scraper/Dockerfile
+    profiles: ["apps"]
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+    env_file: .env
+    environment:
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-secret}@rabbitmq:5672/news_monitor"
+      PROVIDER_URL: http://provider:8080/news-provider
+      MANAGER_URL: http://manager:9000/manager
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      manager:
+        condition: service_healthy
+      provider:
+        condition: service_healthy
+
+  classifier-worker:
+    build:
+      context: ./workers
+      dockerfile: classifier/Dockerfile
+    profiles: ["apps"]
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+    env_file: .env
+    environment:
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-secret}@rabbitmq:5672/news_monitor"
+      PROVIDER_URL: http://provider:8080/news-provider
+      MANAGER_URL: http://manager:9000/manager
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      manager:
+        condition: service_healthy
+      provider:
+        condition: service_healthy
+
+  cluster-worker:
+    build:
+      context: ./workers
+      dockerfile: clusterer/Dockerfile
+      args:
+        EMBEDDING_MODEL_NAME: "${EMBEDDING_MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}"
+    profiles: ["apps"]
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+    env_file: .env
+    environment:
+      RABBITMQ_URL: "amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASSWORD:-secret}@rabbitmq:5672/news_monitor"
+      PROVIDER_URL: http://provider:8080/news-provider
+      MANAGER_URL: http://manager:9000/manager
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-secret}@redis:6379/0"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      manager:
+        condition: service_healthy
+      provider:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   neo4j_data:

@@ -1,0 +1,7 @@
+.git
+target/
+*.md
+.env
+.idea
+*.iml
+postman/

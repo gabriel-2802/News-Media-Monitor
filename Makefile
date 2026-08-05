@@ -1,12 +1,31 @@
 .DEFAULT_GOAL := help
 
-COMPOSE           := docker compose
+COMPOSE := docker compose
+APPS    := --profile apps
+
+# Pull real values from .env when it exists, so these aren't a second,
+# hand-copied source of truth. Note: this only works because .env's values
+# don't contain unescaped `$` or `#` — if that ever changes, escape them
+# (`$$`, or move the value out of here) or this include will misparse.
+ifneq (,$(wildcard .env))
+include .env
+export
+endif
+
 NEO4J_PASSWORD    ?= secretsecret
 RABBITMQ_USER     ?= admin
 RABBITMQ_PASSWORD ?= secret
 RABBITMQ_VHOST    ?= news_monitor
 POSTGRES_USER     ?= postgres
 POSTGRES_DB       ?= news_monitor
+
+# Shared confirmation prompt for destructive targets. Called as
+# `@$(call CONFIRM,message)` — the leading @ (at the call site, not in here)
+# is what suppresses Make's command echo.
+define CONFIRM
+echo "⚠️  WARNING: $(1)"; \
+read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
+endef
 
 .PHONY: help
 help: ## Show available targets
@@ -25,32 +44,42 @@ env: ## Copy .env.example → .env (skips if .env already exists)
 	fi
 
 .PHONY: dev
-dev: env up migrate rabbitmq-setup ## Bootstrap the dev environment: create .env, start services, run migrations and setup
+dev: env up migrate rabbitmq-setup ## Bootstrap infra only: create .env, start infra containers, migrate, setup RabbitMQ
 	@echo ""
 	@echo "✓ Ready!"
 	@echo "Neo4j    → http://localhost:7474  (neo4j / $(NEO4J_PASSWORD))"
 	@echo "RabbitMQ → http://localhost:15672 ($(RABBITMQ_USER) / $(RABBITMQ_PASSWORD))"
+	@echo ""
+	@echo "manager/provider/workers are not started — run them locally, or use 'make up-full'."
 
-# ── Infrastructure ─────────────────────────────────────────────────────────────
+# ── Infrastructure & Apps ──────────────────────────────────────────────────────
+# `up`/`dev` start infra only (neo4j, rabbitmq, postgres, redis) — the old
+# manual-deploy workflow of running manager/provider/workers yourself against
+# that infra keeps working unchanged. `up-full` additionally builds and starts
+# manager, provider, and 3 replicas of each worker as containers.
 
 .PHONY: up
-up: ## Start all services in the background
+up: ## Start infra only (neo4j, rabbitmq, postgres, redis)
 	$(COMPOSE) up -d
 
+.PHONY: up-full
+up-full: ## Build and start EVERYTHING as containers: infra + manager + provider + 3x each worker
+	$(COMPOSE) $(APPS) up -d --build
+
 .PHONY: down
-down: ## Stop all services
-	$(COMPOSE) down
+down: ## Stop all services (infra + apps, if running)
+	$(COMPOSE) $(APPS) down
 
 .PHONY: restart
-restart: down up ## Restart all services
+restart: down up ## Restart infra services
 
 .PHONY: pull
-pull: ## Pull the latest Docker images
-	$(COMPOSE) pull
+pull: ## Pull the latest base images
+	$(COMPOSE) $(APPS) pull
 
 .PHONY: ps
 ps: ## Show running containers and their health status
-	$(COMPOSE) ps
+	$(COMPOSE) $(APPS) ps
 
 .PHONY: status
 status: ps
@@ -58,30 +87,44 @@ status: ps
 # ── Logs ───────────────────────────────────────────────────────────────────────
 
 .PHONY: logs
-logs: ## Stream logs for all services (Ctrl-C to stop)
-	$(COMPOSE) logs -f
+logs: ## Stream logs. Usage: make logs [SERVICE=neo4j|rabbitmq|manager|provider|scraper-worker|classifier-worker|cluster-worker]
+	$(COMPOSE) $(APPS) logs -f $(SERVICE)
 
-.PHONY: logs-neo4j
-logs-neo4j: ## Stream Neo4j logs
-	$(COMPOSE) logs -f neo4j
+.PHONY: logs-manager
+logs-manager: ## Stream manager logs
+	$(COMPOSE) $(APPS) logs -f manager
 
-.PHONY: logs-rabbitmq
-logs-rabbitmq: ## Stream RabbitMQ logs
-	$(COMPOSE) logs -f rabbitmq
+.PHONY: logs-provider
+logs-provider: ## Stream provider logs
+	$(COMPOSE) $(APPS) logs -f provider
+
+.PHONY: logs-scraper
+logs-scraper: ## Stream logs for all scraper-worker replicas
+	$(COMPOSE) $(APPS) logs -f scraper-worker
+
+.PHONY: logs-classifier
+logs-classifier: ## Stream logs for all classifier-worker replicas
+	$(COMPOSE) $(APPS) logs -f classifier-worker
+
+.PHONY: logs-cluster
+logs-cluster: ## Stream logs for all cluster-worker replicas
+	$(COMPOSE) $(APPS) logs -f cluster-worker
 
 # ── Cleanup ────────────────────────────────────────────────────────────────────
 
 .PHONY: clean
 clean: ## Stop services and DELETE all volumes — DESTRUCTIVE
-	@echo "⚠️  WARNING: this removes all persisted Neo4j and RabbitMQ data."
-	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
-	$(COMPOSE) down -v --remove-orphans
+	@$(call CONFIRM,this removes all persisted Neo4j and RabbitMQ data.)
+	$(COMPOSE) $(APPS) down -v --remove-orphans
 
 .PHONY: clean-images
 clean-images: clean ## Remove volumes and prune dangling images
 	docker image prune -f
 
 # ── Neo4j ──────────────────────────────────────────────────────────────────────
+# Migrations now also run automatically when the neo4j container starts (see
+# neo4j/entrypoint-wrapper.sh) — `make migrate` is for picking up a
+# newly-added migration file without restarting the container.
 
 .PHONY: neo4j-shell
 neo4j-shell: ## Open an interactive Cypher Shell session
@@ -104,7 +147,7 @@ neo4j-wait: ## Block until Neo4j accepts connections
 # ── Migrations ─────────────────────────────────────────────────────────────────
 
 .PHONY: migrate
-migrate: neo4j-wait ## Apply all pending Neo4j migrations
+migrate: neo4j-wait ## Re-apply Neo4j migrations (idempotent — only new files run)
 	@echo "Running migrations..."
 	$(COMPOSE) exec -T -e NEO4J_PASSWORD=$(NEO4J_PASSWORD) neo4j bash /migrate.sh
 
@@ -115,8 +158,7 @@ migrate-info: ## List applied migrations stored in Neo4j
 
 .PHONY: migrate-clean
 migrate-clean: ## Delete all migration tracking nodes — dev only, DESTRUCTIVE
-	@echo "WARNING: this removes all migration history from Neo4j (does not undo schema changes)."
-	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
+	@$(call CONFIRM,this removes all migration history from Neo4j (does not undo schema changes).)
 	$(COMPOSE) exec neo4j cypher-shell -u neo4j -p $(NEO4J_PASSWORD) \
 	  "MATCH (m:\`__Migration\`) DELETE m;"
 
@@ -127,12 +169,14 @@ _neo4j-purge-exec:
 
 .PHONY: neo4j-purge
 neo4j-purge: ## Delete ALL data in Neo4j — nodes, relationships, migration history — DESTRUCTIVE
-	@echo "⚠️  WARNING: this deletes ALL data in Neo4j (articles, sources, stories, topics, migration history)."
-	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
+	@$(call CONFIRM,this deletes ALL data in Neo4j (articles, sources, stories, topics, migration history).)
 	@$(MAKE) _neo4j-purge-exec
 	@echo "✓ Neo4j purged. Run 'make migrate' to reapply schema constraints if needed."
 
 # ── RabbitMQ ───────────────────────────────────────────────────────────────────
+# Topology setup now also runs automatically when the rabbitmq container
+# starts (see rabbitmq/entrypoint-wrapper.sh) — `make rabbitmq-setup` is for
+# re-running it by hand (e.g. after editing rabbitmq/setup.sh) without a restart.
 
 .PHONY: rabbitmq-setup
 rabbitmq-setup: ## Re-run topology setup (idempotent — safe to repeat)
@@ -167,8 +211,7 @@ rabbitmq-list-bindings: ## List bindings on the news_monitor vhost
 
 .PHONY: rabbitmq-purge-scrape-jobs
 rabbitmq-purge-scrape-jobs: ## Purge the scrape.jobs queue — DESTRUCTIVE
-	@echo "⚠️  WARNING: all queued messages in scrape.jobs will be discarded."
-	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
+	@$(call CONFIRM,all queued messages in scrape.jobs will be discarded.)
 	$(COMPOSE) exec rabbitmq rabbitmqctl purge_queue scrape.jobs -p $(RABBITMQ_VHOST)
 
 # ── Qdrant ─────────────────────────────────────────────────────────────────────
@@ -189,8 +232,7 @@ _qdrant-purge-exec:
 
 .PHONY: qdrant-purge
 qdrant-purge: ## Delete the story_centroids Qdrant collection (recreated automatically on next cluster-worker start) — DESTRUCTIVE
-	@echo "⚠️  WARNING: this deletes all story centroid vectors in Qdrant."
-	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
+	@$(call CONFIRM,this deletes all story centroid vectors in Qdrant.)
 	@$(MAKE) _qdrant-purge-exec
 
 # ── Postgres ───────────────────────────────────────────────────────────────────
@@ -202,8 +244,7 @@ _postgres-purge-exec:
 
 .PHONY: postgres-purge
 postgres-purge: ## Drop the users schema (all tables + migration history) — DESTRUCTIVE
-	@echo "⚠️  WARNING: this deletes ALL data in Postgres (users, roles, migration history)."
-	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
+	@$(call CONFIRM,this deletes ALL data in Postgres (users, roles, migration history).)
 	@$(MAKE) _postgres-purge-exec
 	@echo "✓ Postgres purged. Restart the manager service to reapply schema migrations."
 
@@ -211,8 +252,7 @@ postgres-purge: ## Drop the users schema (all tables + migration history) — DE
 
 .PHONY: purge-dbs
 purge-dbs: ## Wipe ALL data in both Neo4j and Qdrant — DESTRUCTIVE
-	@echo "⚠️  WARNING: this deletes ALL data in Neo4j AND Qdrant. This cannot be undone."
-	@read -r -p "Continue? [y/N] " ans && [ "$$ans" = "y" ] || exit 1
+	@$(call CONFIRM,this deletes ALL data in Neo4j AND Qdrant. This cannot be undone.)
 	@$(MAKE) _neo4j-purge-exec
 	@$(MAKE) _qdrant-purge-exec
 	@echo "✓ Both databases purged. Run 'make migrate' to reapply Neo4j schema constraints if needed."

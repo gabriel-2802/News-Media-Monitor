@@ -651,6 +651,90 @@ If provider's public key (`JWT_PUBLIC_KEY_PATH`) doesn't match manager's private
 
 ## Running the System
 
+### Prerequisites
+
+- Docker + Docker Compose v2 (`docker compose version`)
+- To run manager/provider outside Docker: JDK 21 + Maven
+- To run workers outside Docker: Python 3
+
+### One-Time Setup
+
+```bash
+make env   # copies env.example → .env (skipped if .env already exists)
+```
+
+Generate the JWT signing keypair. manager signs tokens with the private key, provider only ever holds the public key (see [Authentication](#authentication)):
+
+```bash
+mkdir -p keys
+openssl genpkey -algorithm RSA -out keys/jwt-private.pem -pkeyopt rsa_keygen_bits:2048
+openssl pkey -in keys/jwt-private.pem -pubout -out keys/jwt-public.pem
+```
+
+Both files are gitignored (`keys/.gitignore`) — generate your own per environment, never commit them.
+
+### Two Ways to Run It
+
+**A. Manual dev (infra in Docker, apps run yourself)** — the default:
+
+```bash
+make dev   # env + up (infra only) + migrate + rabbitmq-setup
+```
+
+This starts only neo4j/rabbitmq/postgres/redis as containers. Run each app yourself in its own terminal, from its own directory (all read the root `.env`):
+
+```bash
+cd manager  && mvn spring-boot:run    # http://localhost:9000/manager
+cd provider && mvn spring-boot:run    # http://localhost:8080/news-provider
+
+cd workers && make setup              # one-time: builds a venv per worker type
+cd workers && make scrape-worker      # also: classify-worker, cluster-worker
+```
+
+**B. Fully containerized** — manager, provider, and 3 replicas of each worker also run as containers (all named `news-mm-*`):
+
+```bash
+make up-full
+```
+
+Both workflows share the same infra containers and `.env`. `make up-full`'s services only start under Compose's `apps` profile, so `make up`/`make dev` never pull them in by accident.
+
+### Accessing Manager & Provider
+
+| Service  | Base URL                                | Health               | Swagger UI           |
+| -------- | --------------------------------------- | -------------------- | -------------------- |
+| Manager  | `http://localhost:9000/manager`       | `/actuator/health` | `/swagger-ui.html` |
+| Provider | `http://localhost:8080/news-provider` | `/actuator/health` | `/swagger-ui.html` |
+
+Seeded admin login (from `AdminSeeder` — override via `APP_ADMIN_*` in `.env`):
+
+```bash
+curl -X POST http://localhost:9000/manager/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"Admin123!"}'
+```
+
+Use the returned `token` as `Authorization: Bearer <token>` against provider's `ROLE_ADMIN`/`ROLE_SYSTEM`-protected endpoints.
+
+### Makefile Reference
+
+Run `make help` for the full, always-current list. The ones you'll reach for most:
+
+| Target                                    | What it does                                                                                                                     |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `make dev`                              | Bootstrap infra:`.env`, infra containers, migrations, RabbitMQ setup                                                           |
+| `make up` / `make up-full`            | Start infra only / infra + manager + provider + all workers                                                                      |
+| `make down`                             | Stop everything that's running                                                                                                   |
+| `make ps`                               | Show container status                                                                                                            |
+| `make logs`                             | `SERVICE=<name>` to filter; also `logs-manager`, `logs-provider`, `logs-scraper`, `logs-classifier`, `logs-cluster`  |
+| `make migrate`                          | Re-apply Neo4j migrations (idempotent — already-applied ones skip)                                                              |
+| `make rabbitmq-setup`                   | Re-run RabbitMQ topology setup (idempotent)                                                                                      |
+| `make neo4j-shell` / `rabbitmq-shell` | Open an interactive shell into that container                                                                                    |
+| `make clean`                            | Stop everything and delete all volumes —**destructive**                                                                   |
+| `make *-purge`                          | Wipe a specific datastore's data (`neo4j-purge`, `postgres-purge`, `qdrant-purge`, `purge-dbs`) — **destructive** |
+
+Neo4j migrations and RabbitMQ topology setup both run automatically the moment their container starts (see `neo4j/entrypoint-wrapper.sh` and `rabbitmq/entrypoint-wrapper.sh`) — the `make migrate`/`make rabbitmq-setup` targets above are for re-running them by hand (e.g. a new migration file appeared) without restarting the container.
+
 ## Reliability & Failure Modes
 
 ### Provider Down (Structured Data Unavailable)
